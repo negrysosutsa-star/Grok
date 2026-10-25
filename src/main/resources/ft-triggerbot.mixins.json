@@ -3,9 +3,7 @@
   "minVersion": "0.8",
   "package": "ft.triggerbot.mixin",
   "compatibilityLevel": "JAVA_21",
-  "client": [
-    "ClientPlayerEntityMixin"
-  ],
+  "client": ["ClientPlayerEntityMixin"],
   "injectors": {
     "defaultRequire": 1
   }
