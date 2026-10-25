@@ -29,7 +29,7 @@ public class ClickGui extends Screen {
         addDrawableChild(b(cx,y,w,h,"TB Weapon: "+on(tb.weaponOnly), btn -> { tb.weaponOnly=!tb.weaponOnly; btn.setMessage(Text.literal("TB Weapon: "+on(tb.weaponOnly))); })); y+=g;
         addDrawableChild(new IS(cx-w/2,y,w,h,"MinDelay",tb.minDelay,0,15,v->tb.minDelay=v)); y+=g;
         addDrawableChild(new IS(cx-w/2,y,w,h,"MaxDelay",tb.maxDelay,0,15,v->tb.maxDelay=Math.max(v,tb.minDelay))); y+=g;
-        addDrawableChild(new FS(cx-w/2,y,w,h,"TB Range",tb.range,1,6,v->tb.range=v)); y+=g+4;
+        addDrawableChild(new FS(cx-w/2,y,w,h,"TB Range",tb.range,1,6,v->tb.range=(float)v)); y+=g+4;
 
         addDrawableChild(b(cx,y,w,h,"AimAssist: "+on(aa.enabled), btn -> { aa.toggle(); btn.setMessage(Text.literal("AimAssist: "+on(aa.enabled))); })); y+=g;
         addDrawableChild(b(cx,y,w,h,"AA Bind: "+ClientMain.keyName(aa.key), btn -> { listenAa=true; listenTb=false; btn.setMessage(Text.literal("AA Bind: ...")); })); y+=g;
@@ -37,10 +37,10 @@ public class ClickGui extends Screen {
         addDrawableChild(b(cx,y,w,h,"AA Weapon: "+on(aa.weaponOnly), btn -> { aa.weaponOnly=!aa.weaponOnly; btn.setMessage(Text.literal("AA Weapon: "+on(aa.weaponOnly))); })); y+=g;
         addDrawableChild(b(cx,y,w,h,"AA Walls: "+on(aa.wallCheck), btn -> { aa.wallCheck=!aa.wallCheck; btn.setMessage(Text.literal("AA Walls: "+on(aa.wallCheck))); })); y+=g;
         addDrawableChild(b(cx,y,w,h,"AA OnlyX: "+on(aa.onlyOnX), btn -> { aa.onlyOnX=!aa.onlyOnX; btn.setMessage(Text.literal("AA OnlyX: "+on(aa.onlyOnX))); })); y+=g;
-        addDrawableChild(new FS(cx-w/2,y,w,h,"AA Range",aa.range,1,6,v->aa.range=v)); y+=g;
-        addDrawableChild(new FS(cx-w/2,y,w,h,"AA FOV",aa.fov,20,360,v->aa.fov=v)); y+=g;
-        addDrawableChild(new FS(cx-w/2,y,w,h,"AA Speed",aa.speed,1,40,v->aa.speed=v)); y+=g;
-        addDrawableChild(new FS(cx-w/2,y,w,h,"AA Hold",aa.holdAfterHit,0,20,v->aa.holdAfterHit=v)); y+=g+6;
+        addDrawableChild(new FS(cx-w/2,y,w,h,"AA Range",aa.range,1,6,v->aa.range=(float)v)); y+=g;
+        addDrawableChild(new FS(cx-w/2,y,w,h,"AA FOV",aa.fov,20,360,v->aa.fov=(float)v)); y+=g;
+        addDrawableChild(new FS(cx-w/2,y,w,h,"AA Speed",aa.speed,1,40,v->aa.speed=(float)v)); y+=g;
+        addDrawableChild(new FS(cx-w/2,y,w,h,"AA Hold",aa.holdAfterHit,0,20,v->aa.holdAfterHit=(float)v)); y+=g+6;
 
         addDrawableChild(b(cx,y,w,h,"Close", btn -> close()));
     }
@@ -79,6 +79,6 @@ public class ClickGui extends Screen {
             super(x,y,w,h,Text.empty(),(v-min)/(max-min)); this.l=l; this.min=min; this.max=max; set=s; updateMessage();
         }
         @Override protected void updateMessage(){ setMessage(Text.literal(l+": "+String.format("%.1f",(float)(min+value*(max-min))))); }
-        @Override protected void applyValue(){ set.accept((double)(min+value*(max-min))); }
+        @Override protected void applyValue(){ set.accept(min+value*(max-min)); }
     }
 }
