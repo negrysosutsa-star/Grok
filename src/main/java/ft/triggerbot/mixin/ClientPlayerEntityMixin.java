@@ -5,14 +5,12 @@ import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
-import ft.triggerbot.TriggerBot;
+import ft.triggerbot.ClientMain;
 
 @Mixin(ClientPlayerEntity.class)
 public class ClientPlayerEntityMixin {
     @Inject(method = "tick", at = @At("TAIL"))
     private void onTick(CallbackInfo ci) {
-        if (TriggerBot.INSTANCE != null) {
-            TriggerBot.INSTANCE.tick();
-        }
+        if (ClientMain.INSTANCE != null) ClientMain.INSTANCE.tick();
     }
 }
