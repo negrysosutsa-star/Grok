@@ -5,50 +5,40 @@ import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.util.InputUtil;
 import net.minecraft.entity.Entity;
 import net.minecraft.entity.LivingEntity;
-import net.minecraft.entity.effect.StatusEffects;
 import net.minecraft.entity.player.PlayerEntity;
-import net.minecraft.item.AxeItem;
-import net.minecraft.item.Item;
 import net.minecraft.item.MaceItem;
-import net.minecraft.item.SwordItem;
-import net.minecraft.util.Hand;
 import net.minecraft.util.hit.EntityHitResult;
 import net.minecraft.util.hit.HitResult;
-import net.minecraft.util.math.MathHelper;
-import net.minecraft.util.math.Vec3d;
 import ft.triggerbot.util.ChatUtil;
+import ft.triggerbot.util.CritChecks;
 
 import java.util.concurrent.ThreadLocalRandom;
 
 public class TriggerBot implements ClientModInitializer {
     public static TriggerBot INSTANCE;
 
-    // ===== TriggerBot =====
+    // trigger
     public boolean tbEnabled = false;
     public int tbKey = 82; // R
+    public String critMode = "smart"; // smart | only_crits
     public boolean onlyPlayers = true;
-    public boolean onlyCrits = true;
     public boolean weaponOnly = true;
     public boolean pauseOnUse = true;
+    public boolean throughEntities = false;
     public float range = 3.0f;
     public int minDelay = 2;
     public int maxDelay = 5;
+    public boolean customCooldown = false;
+    public float cooldownPct = 80f;
 
-    // ===== AimAssist =====
-    public boolean aaEnabled = false;
-    public int aaKey = 0; // none by default
-    public float aaRange = 4.5f;
-    public float aaFov = 90f;
-    public float aaSpeed = 8f; // lower = slower
-    public boolean aaPlayersOnly = true;
-    public boolean aaWeaponOnly = true;
-    public boolean aaVisibleOnly = true;
+    // aim
+    public final AimAssist aim = new AimAssist();
 
-    // ===== internal =====
+    // meta
     public int guiKey = 260; // INSERT
     private boolean unhooked = false;
     private int delayTicks = 0;
-    private boolean wasTbKey, wasAaKey, wasGuiKey, wasHome;
+    private boolean wasTb, wasAa, wasGui, wasHome;
     private boolean loadedMsg = false;
 
     @Override
@@ -60,21 +50,19 @@ public class TriggerBot implements ClientModInitializer {
         MinecraftClient mc = MinecraftClient.getInstance();
         if (unhooked || mc.player == null || mc.world == null) return;
 
-        // Insert → gui
-        boolean guiDown = isKeyDown(mc, guiKey);
-        if (guiDown && !wasGuiKey && mc.currentScreen == null) {
+        boolean guiDown = key(mc, guiKey);
+        if (guiDown && !wasGui && mc.currentScreen == null) {
             mc.setScreen(new ClickGui());
         }
-        wasGuiKey = guiDown;
+        wasGui = guiDown;
 
         if (mc.currentScreen != null) return;
 
-        // Home unhook
-        boolean home = isKeyDown(mc, 268);
+        boolean home = key(mc, 268);
         if (home && !wasHome) {
             unhooked = true;
             tbEnabled = false;
-            aaEnabled = false;
+            aim.enabled = false;
             ChatUtil.send("unhooked");
         }
         wasHome = home;
@@ -84,140 +72,80 @@ public class TriggerBot implements ClientModInitializer {
             loadedMsg = true;
         }
 
-        // keybinds toggle
         if (tbKey != 0) {
-            boolean d = isKeyDown(mc, tbKey);
-            if (d && !wasTbKey) {
+            boolean d = key(mc, tbKey);
+            if (d && !wasTb) {
                 tbEnabled = !tbEnabled;
-                ChatUtil.send("trigger " + (tbEnabled ? "on" : "off"));
+                ChatUtil.send("tb " + (tbEnabled ? "on" : "off"));
             }
-            wasTbKey = d;
+            wasTb = d;
         }
-        if (aaKey != 0) {
-            boolean d = isKeyDown(mc, aaKey);
-            if (d && !wasAaKey) {
-                aaEnabled = !aaEnabled;
-                ChatUtil.send("aimassist " + (aaEnabled ? "on" : "off"));
+        if (aim.key != 0) {
+            boolean d = key(mc, aim.key);
+            if (d && !wasAa) {
+                aim.enabled = !aim.enabled;
+                ChatUtil.send("aa " + (aim.enabled ? "on" : "off"));
             }
-            wasAaKey = d;
+            wasAa = d;
         }
 
-        // aim assist first (smooth look)
-        if (aaEnabled) doAimAssist(mc);
-
-        // trigger
+        aim.tick(mc);
         if (tbEnabled) doTrigger(mc);
     }
 
     private void doTrigger(MinecraftClient mc) {
         if (pauseOnUse && mc.player.isUsingItem()) return;
         if (delayTicks > 0) { delayTicks--; return; }
+        if (weaponOnly && !CritChecks.check6()) return;
 
-        if (weaponOnly) {
-            Item item = mc.player.getMainHandStack().getItem();
-            if (!(item instanceof SwordItem || item instanceof AxeItem || item instanceof MaceItem)) return;
-        }
-
-        Entity target = findCrosshairTarget(mc, range);
+        Entity target = resolveTarget(mc);
         if (target == null) return;
         if (!(target instanceof LivingEntity living) || !living.isAlive()) return;
         if (onlyPlayers && !(target instanceof PlayerEntity)) return;
         if (target == mc.player) return;
+        if (mc.player.distanceTo(target) > range) return;
 
-        if (!isCooldownReady(mc)) return;
-        if (onlyCrits && !isCrit(mc)) return;
+        float cd = mc.player.getAttackCooldownProgress(0.0f);
 
-        mc.interactionManager.attackEntity(mc.player, target);
-        mc.player.swingHand(Hand.MAIN_HAND);
-        delayTicks = ThreadLocalRandom.current().nextInt(minDelay, maxDelay + 1);
-    }
-
-    private void doAimAssist(MinecraftClient mc) {
-        if (aaWeaponOnly) {
-            Item item = mc.player.getMainHandStack().getItem();
-            if (!(item instanceof SwordItem || item instanceof AxeItem || item instanceof MaceItem)) return;
+        if (CritChecks.isClass(MaceItem.class)) {
+            if (cd < CritChecks.getFloatBySafe(0.4f)) return;
+            if (!CritChecks.check3() && !CritChecks.check()) return;
+        } else if (customCooldown) {
+            if (cd < cooldownPct / 100f) return;
+            if ("only_crits".equals(critMode) && !CritChecks.check3() && !CritChecks.check()) return;
+        } else {
+            if (!CritChecks.canHit(critMode, cd)) return;
         }
 
-        LivingEntity best = null;
-        double bestAng = Double.MAX_VALUE;
-
-        for (Entity e : mc.world.getEntities()) {
-            if (!(e instanceof LivingEntity living) || !living.isAlive()) continue;
-            if (living == mc.player) continue;
-            if (aaPlayersOnly && !(living instanceof PlayerEntity)) continue;
-            if (mc.player.distanceTo(living) > aaRange) continue;
-            if (aaVisibleOnly && !mc.player.canSee(living)) continue;
-
-            float[] rot = getRotations(mc.player, living);
-            float yawDiff = MathHelper.wrapDegrees(rot[0] - mc.player.getYaw());
-            float pitchDiff = rot[1] - mc.player.getPitch();
-            double ang = Math.sqrt(yawDiff * yawDiff + pitchDiff * pitchDiff);
-            if (ang > aaFov / 2f) continue;
-
-            if (ang < bestAng) {
-                bestAng = ang;
-                best = living;
-            }
+        // smart: if not critting and not impossible → only when not holding jump and on ground-ish
+        if ("smart".equals(critMode) && !CritChecks.check3() && !CritChecks.check()) {
+            if (mc.options.jumpKey.isPressed()) return;
         }
 
-        if (best == null) return;
-
-        float[] rot = getRotations(mc.player, best);
-        float yaw = mc.player.getYaw();
-        float pitch = mc.player.getPitch();
-
-        float dy = MathHelper.wrapDegrees(rot[0] - yaw);
-        float dp = rot[1] - pitch;
-
-        // smooth
-        float factor = MathHelper.clamp(aaSpeed / 50f, 0.02f, 1f);
-        mc.player.setYaw(yaw + dy * factor);
-        mc.player.setPitch(MathHelper.clamp(pitch + dp * factor, -90f, 90f));
+        CritChecks.attack(target);
+        aim.onAttack();
+        delayTicks = ThreadLocalRandom.current().nextInt(minDelay, Math.max(minDelay, maxDelay) + 1);
     }
 
-    private Entity findCrosshairTarget(MinecraftClient mc, float reach) {
+    private Entity resolveTarget(MinecraftClient mc) {
         HitResult hit = mc.crosshairTarget;
         if (hit != null && hit.getType() == HitResult.Type.ENTITY) {
-            Entity e = ((EntityHitResult) hit).getEntity();
-            if (mc.player.distanceTo(e) <= reach) return e;
+            return ((EntityHitResult) hit).getEntity();
         }
         return null;
     }
 
-    private boolean isCooldownReady(MinecraftClient mc) {
-        float need = mc.player.isOnGround() ? 1.0f : 0.9f;
-        return mc.player.getAttackCooldownProgress(0.5f) >= need;
-    }
-
-    private boolean isCrit(MinecraftClient mc) {
-        if (mc.player.getAbilities().flying) return true;
-        if (mc.player.hasStatusEffect(StatusEffects.BLINDNESS)) return true;
-        if (mc.player.hasStatusEffect(StatusEffects.SLOW_FALLING)) return true;
-        if (mc.player.isTouchingWater() || mc.player.isInLava()) return true;
-        if (mc.player.isClimbing() || mc.player.hasVehicle()) return true;
-        // system-style: velocity.y < 0 is more reliable than fallDistance alone
-        return !mc.player.isOnGround() && mc.player.getVelocity().y < -0.01;
-    }
-
-    private static float[] getRotations(PlayerEntity from, Entity to) {
-        Vec3d eye = from.getEyePos();
-        Vec3d pos = to.getPos().add(0, to.getHeight() * 0.5, 0);
-        double dx = pos.x - eye.x;
-        double dy = pos.y - eye.y;
-        double dz = pos.z - eye.z;
-        double dist = Math.sqrt(dx * dx + dz * dz);
-        float yaw = (float) Math.toDegrees(Math.atan2(dz, dx)) - 90f;
-        float pitch = (float) -Math.toDegrees(Math.atan2(dy, dist));
-        return new float[]{yaw, pitch};
-    }
-
-    public static boolean isKeyDown(MinecraftClient mc, int key) {
-        if (key == 0) return false;
-        return InputUtil.isKeyPressed(mc.getWindow().getHandle(), key);
+    private static boolean key(MinecraftClient mc, int k) {
+        if (k == 0) return false;
+        return InputUtil.isKeyPressed(mc.getWindow().getHandle(), k);
     }
 
     public static String keyName(int key) {
         if (key == 0) return "NONE";
-        return InputUtil.fromKeyCode(key, 0).getLocalizedText().getString().toUpperCase();
+        try {
+            return InputUtil.fromKeyCode(key, 0).getLocalizedText().getString().toUpperCase();
+        } catch (Exception e) {
+            return String.valueOf(key);
+        }
     }
 }
