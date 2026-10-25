@@ -3,11 +3,9 @@ package ft.triggerbot.util;
 import net.minecraft.block.BlockState;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.entity.Entity;
-import net.minecraft.entity.LivingEntity;
 import net.minecraft.item.AxeItem;
 import net.minecraft.item.Item;
 import net.minecraft.item.ItemStack;
-import net.minecraft.item.Items;
 import net.minecraft.item.MaceItem;
 import net.minecraft.item.SwordItem;
 import net.minecraft.item.TridentItem;
@@ -21,20 +19,13 @@ public final class CritChecks {
         return MinecraftClient.getInstance();
     }
 
-    /** water / swim / glide / climb / wall / lava / vehicle — crit impossible */
     public static boolean check() {
         var p = mc().player;
         if (p == null) return false;
-        return p.isTouchingWater()
-                || p.isSwimming()
-                || p.isGliding()
-                || p.isClimbing()
-                || p.isInsideWall()
-                || p.isInLava()
-                || p.hasVehicle();
+        return p.isTouchingWater() || p.isSwimming() || p.isGliding()
+                || p.isClimbing() || p.isInsideWall() || p.isInLava() || p.hasVehicle();
     }
 
-    /** axe / trident / mace in hand */
     public static boolean check2() {
         var p = mc().player;
         if (p == null) return false;
@@ -42,12 +33,10 @@ public final class CritChecks {
         return item instanceof AxeItem || item instanceof TridentItem || item instanceof MaceItem;
     }
 
-    /** real falling crit window (velocity.y < -0.01) */
     public static boolean check3() {
         return isFloat(-0.01f);
     }
 
-    /** water + jump held edge case */
     public static boolean check4() {
         var p = mc().player;
         var opt = mc().options;
@@ -57,7 +46,6 @@ public final class CritChecks {
         return p.isOnGround() || p.getVelocity().y > 0.0;
     }
 
-    /** block above head */
     public static boolean check5() {
         var p = mc().player;
         var w = mc().world;
@@ -71,18 +59,12 @@ public final class CritChecks {
         var p = mc().player;
         if (p == null) return false;
         if (p.isOnGround() || p.isInLava() || p.isTouchingWater() || p.hasVehicle()) return false;
-
         double vy = p.getVelocity().y;
         if (check5() && vy < -0.01) {
             double d1 = p.getY() - (p.getBlockPos().down().getY() + 1.0);
             if (d1 > 0.4) return true;
         }
         return vy < value;
-    }
-
-    public static boolean isLivingEntityBlocking(LivingEntity e) {
-        if (!e.isBlocking()) return false;
-        return e.getActiveItem().getItem() == Items.SHIELD;
     }
 
     public static boolean isWeapon(ItemStack stack) {
@@ -114,39 +96,24 @@ public final class CritChecks {
         p.resetLastAttackedTicks();
     }
 
-    /** cooldown threshold like system */
     public static float getFloat() {
         var p = mc().player;
         if (p == null) return 0.8f;
         boolean heavy = check2();
-        if (!p.isOnGround() && !check()) {
-            return heavy ? 0.85f : 0.75f;
-        }
+        if (!p.isOnGround() && !check()) return heavy ? 0.85f : 0.75f;
         return heavy ? 0.95f : 0.8f;
     }
 
-    /**
-     * system mode logic:
-     * "Только криты" → need check() || isFloat
-     * smart / other → on ground needs full cd, in air needs crit or impossible-state
-     */
     public static boolean canHit(String mode, float cdProgress) {
         var p = mc().player;
         if (p == null) return false;
-
         float need = getFloat();
         if (cdProgress < need) return false;
-
-        boolean fallingCrit = isFloat(-0.01f);
+        boolean falling = isFloat(-0.01f);
         boolean impossible = check();
-
-        if ("only_crits".equals(mode)) {
-            return impossible || fallingCrit;
-        }
-
-        // smart
-        if (!impossible && p.getVelocity().y > 0.0) return false; // going up = no
-        if (p.isOnGround()) return cdProgress >= need;
-        return impossible || fallingCrit;
+        if ("only_crits".equals(mode)) return impossible || falling;
+        if (!impossible && p.getVelocity().y > 0.0) return false;
+        if (p.isOnGround()) return true;
+        return impossible || falling;
     }
 }
