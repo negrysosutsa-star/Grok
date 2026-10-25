@@ -34,6 +34,7 @@ public class TriggerBot implements ClientModInitializer {
     private int delayTicks = 0;
     private boolean wasR = false;
     private boolean wasHome = false;
+    private boolean wasRShift = false;
     private boolean loadedMsg = false;
 
     @Override
@@ -43,9 +44,18 @@ public class TriggerBot implements ClientModInitializer {
 
     public void tick() {
         MinecraftClient mc = MinecraftClient.getInstance();
-        if (unhooked || mc.currentScreen != null) return;
+        if (unhooked) return;
 
-        boolean home = isKeyDown(mc, 268); // HOME
+        // Right Shift → open gui
+        boolean rshift = isKeyDown(mc, 344);
+        if (rshift && !wasRShift && mc.currentScreen == null) {
+            mc.setScreen(new ClickGui());
+        }
+        wasRShift = rshift;
+
+        if (mc.currentScreen != null) return;
+
+        boolean home = isKeyDown(mc, 268);
         if (home && !wasHome) {
             unhooked = true;
             enabled = false;
@@ -54,11 +64,11 @@ public class TriggerBot implements ClientModInitializer {
         wasHome = home;
 
         if (!loadedMsg && mc.world != null && mc.player != null) {
-            ChatUtil.send("loaded | R toggle | Home unhook");
+            ChatUtil.send("loaded | R toggle | RShift gui | Home unhook");
             loadedMsg = true;
         }
 
-        boolean r = isKeyDown(mc, 82); // R
+        boolean r = isKeyDown(mc, 82);
         if (r && !wasR) {
             enabled = !enabled;
             ChatUtil.send(enabled ? "on" : "off");
