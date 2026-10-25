@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 1,
+  "id": "ft-triggerbot",
+  "version": "${version}",
+  "name": "FT TriggerBot",
+  "description": "legit triggerbot for funtime 1.21.4",
+  "authors": ["dolp"],
+  "license": "ARR",
+  "environment": "client",
+  "entrypoints": {
+    "client": ["ft.triggerbot.TriggerBot"]
+  },
+  "mixins": ["ft-triggerbot.mixins.json"],
+  "depends": {
+    "fabricloader": ">=0.16.9",
+    "minecraft": "\~1.21.4",
+    "java": ">=21"
+  }
+}
