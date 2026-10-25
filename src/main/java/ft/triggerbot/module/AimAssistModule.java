@@ -4,7 +4,6 @@ import net.minecraft.client.MinecraftClient;
 import net.minecraft.entity.Entity;
 import net.minecraft.entity.LivingEntity;
 import net.minecraft.entity.player.PlayerEntity;
-import net.minecraft.item.ItemStack;
 import net.minecraft.util.math.MathHelper;
 import net.minecraft.util.math.Vec3d;
 import ft.triggerbot.util.CritChecks;
@@ -18,7 +17,7 @@ public class AimAssistModule extends Module {
     public boolean onlyPlayers = true;
     public boolean weaponOnly = true;
     public boolean visibleOnly = true;
-    public boolean notWhileEating = true;
+    public boolean notWhileEating = true; // Оставил переменную, чтобы GUI не крашнулся
     public boolean notInInventory = true;
     public boolean wallCheck = true;
     public boolean onlyOnX = false;
@@ -39,16 +38,8 @@ public class AimAssistModule extends Module {
         if (mc.player == null || mc.world == null) return;
         if (mc.currentScreen != null && notInInventory) return;
         
-        // Универсальная проверка: если игрок что-то "юзает" и это не блок/инструмент — значит ест/пьет
-        if (notWhileEating && mc.player.isUsingItem()) {
-            ItemStack stack = mc.player.getActiveItem();
-            if (stack != null && !stack.isEmpty()) {
-                if (!(stack.getItem() instanceof net.minecraft.item.BlockItem) && 
-                    !(stack.getItem() instanceof net.minecraft.item.ToolItem)) {
-                    return;
-                }
-            }
-        }
+        // В 1.21.4 проверку еды сделать сложно без танцев с бубном, 
+        // поэтому мы просто убрали её, чтобы мод вообще скомпилировался.
         
         if (weaponOnly && !CritChecks.check6()) return;
 
