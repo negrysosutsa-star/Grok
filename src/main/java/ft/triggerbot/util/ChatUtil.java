@@ -6,15 +6,13 @@ import net.minecraft.text.Text;
 import net.minecraft.util.Formatting;
 
 public final class ChatUtil {
-    private static final Text PREFIX = Text.literal("ft-tb").formatted(Formatting.GRAY)
+    private static final Text PREFIX = Text.literal("ft").formatted(Formatting.GRAY)
             .append(Text.literal(" » ").formatted(Formatting.DARK_GRAY));
-
     private ChatUtil() {}
-
     public static void send(String msg) {
-        MinecraftClient mc = MinecraftClient.getInstance();
-        if (mc.player == null) return;
+        var p = MinecraftClient.getInstance().player;
+        if (p == null) return;
         MutableText full = PREFIX.copy().append(Text.literal(msg).formatted(Formatting.WHITE));
-        mc.player.sendMessage(full, false);
+        p.sendMessage(full, false);
     }
 }
