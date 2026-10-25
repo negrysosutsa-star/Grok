@@ -24,8 +24,8 @@ public class TriggerBot implements ClientModInitializer {
     public boolean onlyCrits = true;
     public boolean pauseOnUse = true;
     public boolean weaponOnly = true;
-    public int minDelay = 8;
-    public int maxDelay = 12;
+    public int minDelay = 2;
+    public int maxDelay = 5;
 
     public boolean enabled = false;
     private boolean unhooked = false;
@@ -94,28 +94,30 @@ public class TriggerBot implements ClientModInitializer {
         if (onlyPlayers && !(target instanceof PlayerEntity)) return;
         if (target == mc.player) return;
 
-        if (!canAttack(mc, living)) return;
+        if (!isReady(mc)) return;
+        if (onlyCrits && !isCrit(mc)) return;
 
         mc.interactionManager.attackEntity(mc.player, target);
         mc.player.swingHand(Hand.MAIN_HAND);
         delayTicks = ThreadLocalRandom.current().nextInt(minDelay, maxDelay + 1);
     }
 
-    private boolean canAttack(MinecraftClient mc, LivingEntity target) {
-        float cooldown = mc.player.getAttackCooldownProgress(0.5f);
-        if (cooldown < 0.9f) return false;
+    private boolean isReady(MinecraftClient mc) {
+        // в воздухе можно чуть раньше
+        float need = mc.player.isOnGround() ? 1.0f : 0.9f;
+        return mc.player.getAttackCooldownProgress(0.5f) >= need;
+    }
 
-        if (!onlyCrits) return true;
+    private boolean isCrit(MinecraftClient mc) {
+        // состояния в которых крит физически невозможен — бьём обычным
+        if (mc.player.getAbilities().flying) return true;
+        if (mc.player.hasStatusEffect(StatusEffects.BLINDNESS)) return true;
+        if (mc.player.hasStatusEffect(StatusEffects.SLOW_FALLING)) return true;
+        if (mc.player.isTouchingWater() || mc.player.isInLava()) return true;
+        if (mc.player.isClimbing()) return true;
+        if (mc.player.hasVehicle()) return true;
 
-        if (mc.player.getAbilities().flying
-                || mc.player.hasStatusEffect(StatusEffects.BLINDNESS)
-                || mc.player.hasStatusEffect(StatusEffects.SLOW_FALLING)
-                || mc.player.isTouchingWater()
-                || mc.player.isInLava()
-                || mc.player.isClimbing()) {
-            return true;
-        }
-
+        // настоящий крит: не на земле и уже падаем
         return !mc.player.isOnGround() && mc.player.fallDistance > 0.0f;
     }
 
