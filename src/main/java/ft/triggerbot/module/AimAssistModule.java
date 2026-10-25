@@ -4,7 +4,7 @@ import net.minecraft.client.MinecraftClient;
 import net.minecraft.entity.Entity;
 import net.minecraft.entity.LivingEntity;
 import net.minecraft.entity.player.PlayerEntity;
-import net.minecraft.util.UseAction;
+import net.minecraft.item.UseAction;;
 import net.minecraft.util.math.MathHelper;
 import net.minecraft.util.math.Vec3d;
 import ft.triggerbot.util.CritChecks;
