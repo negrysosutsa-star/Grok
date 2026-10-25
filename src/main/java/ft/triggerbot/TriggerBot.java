@@ -20,14 +20,12 @@ import java.util.concurrent.ThreadLocalRandom;
 public class TriggerBot implements ClientModInitializer {
     public static TriggerBot INSTANCE;
 
-    // ===== settings =====
     public boolean onlyPlayers = true;
     public boolean onlyCrits = true;
     public boolean pauseOnUse = true;
     public boolean weaponOnly = true;
     public int minDelay = 8;
     public int maxDelay = 12;
-    // ====================
 
     public boolean enabled = false;
     private boolean unhooked = false;
@@ -46,7 +44,6 @@ public class TriggerBot implements ClientModInitializer {
         MinecraftClient mc = MinecraftClient.getInstance();
         if (unhooked) return;
 
-        // Right Shift → open gui
         boolean rshift = isKeyDown(mc, 344);
         if (rshift && !wasRShift && mc.currentScreen == null) {
             mc.setScreen(new ClickGui());
@@ -110,7 +107,6 @@ public class TriggerBot implements ClientModInitializer {
 
         if (!onlyCrits) return true;
 
-        // эти состояния убивают крит → бьём как есть
         if (mc.player.getAbilities().flying
                 || mc.player.hasStatusEffect(StatusEffects.BLINDNESS)
                 || mc.player.hasStatusEffect(StatusEffects.SLOW_FALLING)
@@ -120,5 +116,10 @@ public class TriggerBot implements ClientModInitializer {
             return true;
         }
 
-        // настоящий крит: в воздухе и падаем
-        return !mc
+        return !mc.player.isOnGround() && mc.player.fallDistance > 0.0f;
+    }
+
+    private static boolean isKeyDown(MinecraftClient mc, int key) {
+        return net.minecraft.client.util.InputUtil.isKeyPressed(mc.getWindow().getHandle(), key);
+    }
+}
