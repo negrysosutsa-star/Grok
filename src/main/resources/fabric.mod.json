@@ -1,14 +1,14 @@
 {
   "schemaVersion": 1,
   "id": "ft-triggerbot",
-  "version": "1.1",
-  "name": "FT TriggerBot",
-  "description": "legit triggerbot",
+  "version": "1.2",
+  "name": "FT Client",
+  "description": "triggerbot + aimassist",
   "authors": ["dolp"],
   "license": "ARR",
   "environment": "client",
   "entrypoints": {
-    "client": ["ft.triggerbot.TriggerBot"]
+    "client": ["ft.triggerbot.ClientMain"]
   },
   "mixins": ["ft-triggerbot.mixins.json"],
   "depends": {
