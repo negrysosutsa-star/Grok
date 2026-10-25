@@ -21,4 +21,10 @@ public final class RandomUtil {
     public static double snap(double gcd, double delta) {
         return gcd <= 1e-4 ? delta : delta - delta % gcd;
     }
+
+    /** Случайное целое от 0 (включительно) до bound (не включая) */
+    public static int nextInt(int bound) {
+        if (bound <= 0) return 0;
+        return (int)(Math.random() * bound);
+    }
 }
