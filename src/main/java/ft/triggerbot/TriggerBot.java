@@ -106,24 +106,19 @@ public class TriggerBot implements ClientModInitializer {
 
     private boolean canAttack(MinecraftClient mc, LivingEntity target) {
         float cooldown = mc.player.getAttackCooldownProgress(0.5f);
-        float needed = mc.player.isOnGround() ? 1.0f : 0.9f;
-        if (cooldown < needed) return false;
+        if (cooldown < 0.9f) return false;
 
         if (!onlyCrits) return true;
 
-        boolean skip = mc.player.getAbilities().flying
+        // эти состояния убивают крит → бьём как есть
+        if (mc.player.getAbilities().flying
                 || mc.player.hasStatusEffect(StatusEffects.BLINDNESS)
-                || mc.player.hasStatusEffect(StatusEffects.SLOW_FALLING);
+                || mc.player.hasStatusEffect(StatusEffects.SLOW_FALLING)
+                || mc.player.isTouchingWater()
+                || mc.player.isInLava()
+                || mc.player.isClimbing()) {
+            return true;
+        }
 
-        if (skip) return true;
-        if (!mc.options.jumpKey.isPressed() && mc.player.isOnGround()) return true;
-        if (mc.player.fallDistance > 0.0f && !mc.player.isOnGround()) return true;
-        if (mc.player.isTouchingWater() || mc.player.isInLava() || mc.player.isClimbing()) return true;
-
-        return false;
-    }
-
-    private static boolean isKeyDown(MinecraftClient mc, int key) {
-        return net.minecraft.client.util.InputUtil.isKeyPressed(mc.getWindow().getHandle(), key);
-    }
-}
+        // настоящий крит: в воздухе и падаем
+        return !mc
