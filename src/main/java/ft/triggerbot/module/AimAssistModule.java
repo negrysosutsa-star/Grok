@@ -38,9 +38,9 @@ public class AimAssistModule extends Module {
         if (mc.player == null || mc.world == null) return;
         if (mc.currentScreen != null && notInInventory) return;
         
-        // Исправлено для 1.21.4: isFood() вызывается у getItem()
+        // Исправлено для 1.21.4: проверка через компонент еды
         if (notWhileEating && mc.player.isUsingItem()) {
-            if (mc.player.getActiveItem().getItem().isFood()) return;
+            if (mc.player.getActiveItem().getFoodComponent() != null) return;
         }
         
         if (weaponOnly && !CritChecks.check6()) return;
