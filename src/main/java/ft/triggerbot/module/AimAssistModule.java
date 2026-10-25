@@ -4,6 +4,7 @@ import net.minecraft.client.MinecraftClient;
 import net.minecraft.entity.Entity;
 import net.minecraft.entity.LivingEntity;
 import net.minecraft.entity.player.PlayerEntity;
+import net.minecraft.item.ItemStack;
 import net.minecraft.util.math.MathHelper;
 import net.minecraft.util.math.Vec3d;
 import ft.triggerbot.util.CritChecks;
@@ -38,9 +39,15 @@ public class AimAssistModule extends Module {
         if (mc.player == null || mc.world == null) return;
         if (mc.currentScreen != null && notInInventory) return;
         
-        // Исправлено для 1.21.4: проверка через компонент еды
+        // Универсальная проверка: если игрок что-то "юзает" и это не блок/инструмент — значит ест/пьет
         if (notWhileEating && mc.player.isUsingItem()) {
-            if (mc.player.getActiveItem().getFoodComponent() != null) return;
+            ItemStack stack = mc.player.getActiveItem();
+            if (stack != null && !stack.isEmpty()) {
+                if (!(stack.getItem() instanceof net.minecraft.item.BlockItem) && 
+                    !(stack.getItem() instanceof net.minecraft.item.ToolItem)) {
+                    return;
+                }
+            }
         }
         
         if (weaponOnly && !CritChecks.check6()) return;
