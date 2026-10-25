@@ -4,7 +4,6 @@ import net.minecraft.client.MinecraftClient;
 import net.minecraft.entity.Entity;
 import net.minecraft.entity.LivingEntity;
 import net.minecraft.entity.player.PlayerEntity;
-import net.minecraft.util.UseAction;
 import net.minecraft.util.math.MathHelper;
 import net.minecraft.util.math.Vec3d;
 import ft.triggerbot.util.CritChecks;
@@ -38,10 +37,12 @@ public class AimAssistModule extends Module {
     public void onTick(MinecraftClient mc) {
         if (mc.player == null || mc.world == null) return;
         if (mc.currentScreen != null && notInInventory) return;
+        
+        // Исправленная проверка на еду (без UseAction)
         if (notWhileEating && mc.player.isUsingItem()) {
-            UseAction a = mc.player.getActiveItem().getUseAction();
-            if (a == UseAction.EAT || a == UseAction.DRINK) return;
+            if (mc.player.getActiveItem().isFood()) return;
         }
+        
         if (weaponOnly && !CritChecks.check6()) return;
 
         rotation.update();
