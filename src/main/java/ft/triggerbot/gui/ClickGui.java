@@ -157,7 +157,8 @@ public class ClickGui extends Screen {
 
         super.render(ctx, mouseX, mouseY, delta);
     }
-// ────────────────────────────────────────────────────────────────
+
+    // ────────────────────────────────────────────────────────────────
     // TriggerBot tab
     // ────────────────────────────────────────────────────────────────
     private int renderTBTab(DrawContext ctx, int x, int y, int w, int mx, int my) {
@@ -340,7 +341,8 @@ public class ClickGui extends Screen {
 
         return y + h;
     }
-private int renderKeybindRow(DrawContext ctx, int x, int y, int w, int mx, int my,
+
+    private int renderKeybindRow(DrawContext ctx, int x, int y, int w, int mx, int my,
                                  String label, String keyName, int bindIndex) {
         boolean hover = mx >= x && mx < x + w && my >= y && my < y + ROW_H;
         if (hover) fillRect(ctx, x - 1, y, w + 2, ROW_H, COL_HOVER);
@@ -570,7 +572,8 @@ private int renderKeybindRow(DrawContext ctx, int x, int y, int w, int mx, int m
 
     @Override
     public boolean shouldCloseOnEsc() { return false; }
-// ────────────────────────────────────────────────────────────────
+
+    // ────────────────────────────────────────────────────────────────
     // Утилиты
     // ────────────────────────────────────────────────────────────────
 
