@@ -13,10 +13,10 @@ import ft.triggerbot.util.TickCounter;
 public class ClientMain implements ClientModInitializer {
     public static ClientMain INSTANCE;
     public final TriggerBotModule triggerBot = new TriggerBotModule();
-    public final AimAssistModule aimAssist = new AimAssistModule();
+    public final AimAssistModule  aimAssist  = new AimAssistModule();
     public final Module[] modules = { triggerBot, aimAssist };
 
-    public int guiKey = 260;
+    public int guiKey = 260; // INSERT
     private boolean unhooked, wasGui, wasHome, loaded;
     private final boolean[] wasKey = new boolean[2];
 
@@ -28,11 +28,13 @@ public class ClientMain implements ClientModInitializer {
         if (unhooked || mc.player == null) return;
         TickCounter.update();
 
+        // Открыть GUI
         boolean gui = key(mc, guiKey);
         if (gui && !wasGui && mc.currentScreen == null) mc.setScreen(new ClickGui());
         wasGui = gui;
         if (mc.currentScreen != null) return;
 
+        // Unhook
         boolean home = key(mc, 268);
         if (home && !wasHome) {
             unhooked = true;
@@ -41,15 +43,18 @@ public class ClientMain implements ClientModInitializer {
         }
         wasHome = home;
 
+        // Приветствие
         if (!loaded) {
             ChatUtil.send("loaded | Insert menu | Home unhook");
             loaded = true;
         }
 
+        // Биндинги из поля keyCode (используем .key только как алиас, см. ниже)
         for (int i = 0; i < modules.length; i++) {
             Module m = modules[i];
-            if (m.key == 0) continue;
-            boolean d = key(mc, m.key);
+            int k = getModuleKey(m);
+            if (k == 0) continue;
+            boolean d = key(mc, k);
             if (d && !wasKey[i]) {
                 m.toggle();
                 ChatUtil.send(m.name + " " + (m.enabled ? "on" : "off"));
@@ -57,7 +62,16 @@ public class ClientMain implements ClientModInitializer {
             wasKey[i] = d;
         }
 
-        for (Module m : modules) if (m.enabled) m.onTick(mc);
+        // Тик модулей
+        triggerBot.onTick(mc, aimAssist); // передаём aimAssist для onAttack
+        if (aimAssist.enabled) aimAssist.onTick(mc);
+    }
+
+    /** Получить кнопку модуля — читаем keyCode из конкретных классов */
+    private static int getModuleKey(Module m) {
+        if (m instanceof TriggerBotModule tb) return tb.keyCode;
+        if (m instanceof AimAssistModule  aa) return aa.keyCode;
+        return m.key;
     }
 
     private static boolean key(MinecraftClient mc, int k) {
