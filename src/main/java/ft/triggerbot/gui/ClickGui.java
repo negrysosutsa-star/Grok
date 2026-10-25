@@ -74,11 +74,11 @@ public class ClickGui extends Screen {
         @Override protected void applyValue(){ set.accept((int)Math.round(min+value*(max-min))); }
     }
     private class FS extends SliderWidget {
-        final String l; final float min,max; final java.util.function.FloatConsumer set;
-        FS(int x,int y,int w,int h,String l,float v,float min,float max,java.util.function.FloatConsumer s){
+        final String l; final float min,max; final java.util.function.DoubleConsumer set;
+        FS(int x,int y,int w,int h,String l,float v,float min,float max,java.util.function.DoubleConsumer s){
             super(x,y,w,h,Text.empty(),(v-min)/(max-min)); this.l=l; this.min=min; this.max=max; set=s; updateMessage();
         }
         @Override protected void updateMessage(){ setMessage(Text.literal(l+": "+String.format("%.1f",(float)(min+value*(max-min))))); }
-        @Override protected void applyValue(){ set.accept((float)(min+value*(max-min))); }
+        @Override protected void applyValue(){ set.accept((double)(min+value*(max-min))); }
     }
 }
