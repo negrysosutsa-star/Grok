@@ -162,7 +162,6 @@ public class ClickGui extends Screen {
     // TriggerBot tab
     // ────────────────────────────────────────────────────────────────
     private int renderTBTab(DrawContext ctx, int x, int y, int w, int mx, int my) {
-    private int renderTBTab(DrawContext ctx, int x, int y, int w, int mx, int my) {
         int startY = y;
 
         y = renderToggleRow(ctx, x, y, w, mx, my, "TriggerBot", triggerBot.enabled, 100);
