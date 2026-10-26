@@ -6,6 +6,7 @@ import net.minecraft.client.render.Camera;
 import net.minecraft.client.render.GameRenderer;
 import net.minecraft.client.render.RenderTickCounter;
 import net.minecraft.client.render.WorldRenderer;
+// Scene (class_9779) не экспортирован — используем Object
 import net.minecraft.client.util.math.MatrixStack;
 import net.minecraft.util.math.Vec3d;
 import org.joml.Matrix4f;
@@ -23,7 +24,7 @@ public class WorldRendererMixin {
     // class_9779 = Scene (net.minecraft.client.render.Scene)
     @Inject(method = "render", at = @At("TAIL"))
     private void onRender(RenderTickCounter tickCounter,
-                          net.minecraft.client.render.Scene scene,
+                          Object scene,
                           boolean bl,
                           Camera camera,
                           GameRenderer gameRenderer,
