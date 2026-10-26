@@ -5,6 +5,7 @@ import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.util.InputUtil;
 import ft.triggerbot.gui.ClickGui;
 import ft.triggerbot.module.AimAssistModule;
+import ft.triggerbot.module.EspModule;
 import ft.triggerbot.module.Module;
 import ft.triggerbot.module.TriggerBotModule;
 import ft.triggerbot.util.ChatUtil;
@@ -14,11 +15,12 @@ public class ClientMain implements ClientModInitializer {
     public static ClientMain INSTANCE;
     public final TriggerBotModule triggerBot = new TriggerBotModule();
     public final AimAssistModule  aimAssist  = new AimAssistModule();
-    public final Module[] modules = { triggerBot, aimAssist };
+    public final EspModule        esp        = new EspModule();
+    public final Module[] modules = { triggerBot, aimAssist, esp };
 
-    public int guiKey = 260; // INSERT
+    public int guiKey = 260; // F4
     private boolean unhooked, wasGui, wasHome, loaded;
-    private final boolean[] wasKey = new boolean[2];
+    private final boolean[] wasKey = new boolean[3];
 
     @Override
     public void onInitializeClient() { INSTANCE = this; }
@@ -28,13 +30,11 @@ public class ClientMain implements ClientModInitializer {
         if (unhooked || mc.player == null) return;
         TickCounter.update();
 
-        // Открыть GUI
         boolean gui = key(mc, guiKey);
         if (gui && !wasGui && mc.currentScreen == null) mc.setScreen(new ClickGui());
         wasGui = gui;
         if (mc.currentScreen != null) return;
 
-        // Unhook
         boolean home = key(mc, 268);
         if (home && !wasHome) {
             unhooked = true;
@@ -43,13 +43,11 @@ public class ClientMain implements ClientModInitializer {
         }
         wasHome = home;
 
-        // Приветствие
         if (!loaded) {
-            ChatUtil.send("loaded | Insert menu | Home unhook");
+            ChatUtil.send("loaded | F4 menu | Home unhook");
             loaded = true;
         }
 
-        // Биндинги из поля keyCode (используем .key только как алиас, см. ниже)
         for (int i = 0; i < modules.length; i++) {
             Module m = modules[i];
             int k = getModuleKey(m);
@@ -62,15 +60,15 @@ public class ClientMain implements ClientModInitializer {
             wasKey[i] = d;
         }
 
-        // Тик модулей
-        triggerBot.onTick(mc, aimAssist); // передаём aimAssist для onAttack
+        triggerBot.onTick(mc, aimAssist);
         if (aimAssist.enabled) aimAssist.onTick(mc);
+        // ESP рендерится из WorldRendererMixin, не здесь
     }
 
-    /** Получить кнопку модуля — читаем keyCode из конкретных классов */
     private static int getModuleKey(Module m) {
         if (m instanceof TriggerBotModule tb) return tb.keyCode;
         if (m instanceof AimAssistModule  aa) return aa.keyCode;
+        if (m instanceof EspModule        e)  return e.keyCode;
         return m.key;
     }
 
