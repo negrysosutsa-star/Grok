@@ -10,7 +10,6 @@ import net.minecraft.text.Text;
 
 public class ClickGui extends Screen {
 
-    // Цвета (ARGB)
     private static final int COL_BG        = 0xE5121212;
     private static final int COL_HEADER    = 0xFF1A1A1A;
     private static final int COL_ACCENT    = 0xFF5865F2;
@@ -32,35 +31,17 @@ public class ClickGui extends Screen {
     private final TriggerBotModule triggerBot;
     private final AimAssistModule  aimAssist;
 
-    // 0 = TriggerBot, 1 = AimAssist
     private int activeTab = 0;
 
-    // Drag
     private int winX, winY;
     private boolean dragging;
     private int dragOffX, dragOffY;
 
-    // Slider drag state
-    private int draggingSlider = -1; // индекс слайдера
-    private int mx, my;
-
-    // Scroll
     private float scrollY = 0;
     private static final float SCROLL_SPEED = 18f;
     private int contentHeight = 0;
 
-    // Keybind capture
-    private int capturingKey = -1; // -1 = нет, 0 = TB bind, 1 = AA bind
-
-    // ==================================================================
-    // Описание всех строк UI — собирается при рендере
-    // ==================================================================
-    private interface Row {
-        void render(DrawContext ctx, int wx, int wy, int rowW, int y, int mouseX, int mouseY);
-        boolean onClick(int wx, int wy, int rowW, int y, int mouseX, int mouseY, int btn);
-        default boolean onScrollOver(int wx, int wy, int rowW, int y, int mouseX, int mouseY) { return false; }
-        int getHeight();
-    }
+    private int capturingKey = -1;
 
     public ClickGui() {
         super(Text.literal("FT Client"));
@@ -76,132 +57,93 @@ public class ClickGui extends Screen {
         scrollY = 0;
     }
 
-    // ────────────────────────────────────────────────────────────────
+    // ════════════════════════════════════════════════════════════════
     // RENDER
-    // ────────────────────────────────────────────────────────────────
+    // ════════════════════════════════════════════════════════════════
+
     @Override
     public void render(DrawContext ctx, int mouseX, int mouseY, float delta) {
-        // Затемнение фона
         this.renderBackground(ctx, mouseX, mouseY, delta);
 
-        int wx = winX;
-        int wy = winY;
+        int wx = winX, wy = winY;
 
-        // Тень окна
         fillRect(ctx, wx - 4, wy - 4, WIN_W + 8, WIN_H + 8, 0x55000000);
-
-        // Основное окно
         fillRect(ctx, wx, wy, WIN_W, WIN_H, COL_BG);
-
-        // Заголовок
         fillRect(ctx, wx, wy, WIN_W, TAB_H, COL_HEADER);
         drawString(ctx, "§bFT Client §7v1.2", wx + PAD, wy + TAB_H / 2 - 4, COL_TEXT);
 
-        // Вкладки
         int tabW = WIN_W / 2;
         for (int i = 0; i < 2; i++) {
-            String label = i == 0 ? "TriggerBot" : "AimAssist";
-            boolean active = activeTab == i;
+            String label   = i == 0 ? "TriggerBot" : "AimAssist";
+            boolean active  = activeTab == i;
             boolean enabled = i == 0 ? triggerBot.enabled : aimAssist.enabled;
-            int tx = wx + i * tabW;
-            int ty = wy + TAB_H;
+            int tx = wx + i * tabW, ty = wy + TAB_H;
             boolean hover = mouseX >= tx && mouseX < tx + tabW && mouseY >= ty && mouseY < ty + 22;
-
-            int bgCol = active ? COL_ACCENT : (hover ? COL_HOVER : COL_HEADER);
-            fillRect(ctx, tx, ty, tabW, 22, bgCol);
-
-            // Индикатор включён
-            int indicatorCol = enabled ? COL_ENABLED : COL_DISABLED;
-            fillRect(ctx, tx + 8, ty + 8, 6, 6, indicatorCol);
-
+            fillRect(ctx, tx, ty, tabW, 22, active ? COL_ACCENT : (hover ? COL_HOVER : COL_HEADER));
+            fillRect(ctx, tx + 8, ty + 8, 6, 6, enabled ? COL_ENABLED : COL_DISABLED);
             drawString(ctx, label, tx + 20, ty + 7, active ? 0xFFFFFFFF : COL_SUBTEXT);
-
-            // Нижняя линия активной вкладки
-            if (active) {
-                fillRect(ctx, tx, ty + 20, tabW, 2, COL_ACCENT);
-            }
+            if (active) fillRect(ctx, tx, ty + 20, tabW, 2, COL_ACCENT);
         }
 
         int contentTop = wy + TAB_H + 22 + 2;
         int contentH   = WIN_H - TAB_H - 22 - 2;
 
-        // Клип контента
         ctx.enableScissor(wx, contentTop, wx + WIN_W, contentTop + contentH);
-
         int y = contentTop - (int) scrollY;
         int rowW = WIN_W - PAD * 2;
-        int totalH = 0;
-
-        // Рендер строк текущей вкладки
-        if (activeTab == 0) {
-            totalH = renderTBTab(ctx, wx + PAD, y, rowW, mouseX, mouseY);
-        } else {
-            totalH = renderAATab(ctx, wx + PAD, y, rowW, mouseX, mouseY);
-        }
+        int totalH = activeTab == 0
+            ? renderTBTab(ctx, wx + PAD, y, rowW, mouseX, mouseY)
+            : renderAATab(ctx, wx + PAD, y, rowW, mouseX, mouseY);
         contentHeight = totalH;
-
         ctx.disableScissor();
 
-        // Скроллбар
         if (contentHeight > contentH) {
-            float ratio    = (float) contentH / contentHeight;
-            int sbH        = Math.max(20, (int) (contentH * ratio));
-            int sbX        = wx + WIN_W - 4;
-            int sbY        = contentTop + (int) (scrollY / contentHeight * contentH);
+            float ratio = (float) contentH / contentHeight;
+            int sbH = Math.max(20, (int)(contentH * ratio));
+            int sbX = wx + WIN_W - 4;
+            int sbY = contentTop + (int)(scrollY / contentHeight * contentH);
             fillRect(ctx, sbX, contentTop, 3, contentH, 0x22FFFFFF);
             fillRect(ctx, sbX, sbY, 3, sbH, COL_ACCENT);
         }
 
-        // Линия-разделитель после вкладок
         fillRect(ctx, wx, contentTop, WIN_W, 1, COL_DIVIDER);
-
         super.render(ctx, mouseX, mouseY, delta);
     }
 
-    // ────────────────────────────────────────────────────────────────
-    // TriggerBot tab
-    // ────────────────────────────────────────────────────────────────
+    // ════════════════════════════════════════════════════════════════
+    // TABS RENDER
+    // ════════════════════════════════════════════════════════════════
+
     private int renderTBTab(DrawContext ctx, int x, int y, int w, int mx, int my) {
         int startY = y;
 
-        y = renderToggleRow(ctx, x, y, w, mx, my, "TriggerBot", triggerBot.enabled, 100);
+        y = renderToggleRow(ctx, x, y, w, mx, my, "TriggerBot", triggerBot.enabled);
         y = renderDivider(ctx, x, y, w);
-        y = renderSectionLabel(ctx, x, y, w, "РЕЖИМ");
-
+        y = renderSectionLabel(ctx, x, y, "РЕЖИМ");
         y = renderCycleRow(ctx, x, y, w, mx, my, "Крит-режим",
-            new String[]{"smart", "only_crits"},
-            new String[]{"Смарт", "Только криты"},
-            triggerBot.critMode, 101);
-
+            new String[]{"smart","only_crits"}, new String[]{"Смарт","Только криты"},
+            triggerBot.critMode);
         y = renderDivider(ctx, x, y, w);
-        y = renderSectionLabel(ctx, x, y, w, "ФИЛЬТРЫ");
-
-        y = renderToggleRow(ctx, x, y, w, mx, my, "Только игроки",    triggerBot.onlyPlayers,  102);
-        y = renderToggleRow(ctx, x, y, w, mx, my, "Только с оружием", triggerBot.weaponOnly,   103);
-        y = renderToggleRow(ctx, x, y, w, mx, my, "Пауза при исп.",   triggerBot.pauseOnUse,   104);
-
+        y = renderSectionLabel(ctx, x, y, "ФИЛЬТРЫ");
+        y = renderToggleRow(ctx, x, y, w, mx, my, "Только игроки",    triggerBot.onlyPlayers);
+        y = renderToggleRow(ctx, x, y, w, mx, my, "Только с оружием", triggerBot.weaponOnly);
+        y = renderToggleRow(ctx, x, y, w, mx, my, "Пауза при исп.",   triggerBot.pauseOnUse);
         y = renderDivider(ctx, x, y, w);
-        y = renderSectionLabel(ctx, x, y, w, "КУЛДАУН");
-
-        y = renderToggleRow(ctx, x, y, w, mx, my, "Свой кулдаун %",   triggerBot.customCooldown, 105);
+        y = renderSectionLabel(ctx, x, y, "КУЛДАУН");
+        y = renderToggleRow(ctx, x, y, w, mx, my, "Свой кулдаун %",   triggerBot.customCooldown);
         if (triggerBot.customCooldown)
-            y = renderSliderRow(ctx, x, y, w, mx, my, "Кулдаун %", triggerBot.cooldownPct, 0f, 100f, 0, 200);
-
+            y = renderSliderRow(ctx, x, y, w, "Кулдаун %", triggerBot.cooldownPct, 0f, 100f, 0);
         y = renderDivider(ctx, x, y, w);
-        y = renderSectionLabel(ctx, x, y, w, "ЗАДЕРЖКА");
-
-        y = renderSliderRow(ctx, x, y, w, mx, my, "Мин. задержка (мс)", triggerBot.minDelay, 0f, 300f, 0, 201);
-        y = renderSliderRow(ctx, x, y, w, mx, my, "Макс. задержка (мс)", triggerBot.maxDelay, 0f, 300f, 0, 202);
-
+        y = renderSectionLabel(ctx, x, y, "ЗАДЕРЖКА");
+        y = renderSliderRow(ctx, x, y, w, "Мин. задержка (мс)", triggerBot.minDelay, 0f, 300f, 0);
+        y = renderSliderRow(ctx, x, y, w, "Макс. задержка (мс)", triggerBot.maxDelay, 0f, 300f, 0);
         y = renderDivider(ctx, x, y, w);
-        y = renderSectionLabel(ctx, x, y, w, "ДОПОЛНИТЕЛЬНО");
-
-        y = renderToggleRow(ctx, x, y, w, mx, my, "Сброс спринта",  triggerBot.sprintReset, 106);
-        y = renderToggleRow(ctx, x, y, w, mx, my, "TPS-поправка",   triggerBot.tpsSink,     107);
-        y = renderSliderRow(ctx, x, y, w, mx, my, "Дальность",      (float) triggerBot.range, 1f, 6f, 1, 203);
-
+        y = renderSectionLabel(ctx, x, y, "ДОПОЛНИТЕЛЬНО");
+        y = renderToggleRow(ctx, x, y, w, mx, my, "Сброс спринта", triggerBot.sprintReset);
+        y = renderToggleRow(ctx, x, y, w, mx, my, "TPS-поправка",  triggerBot.tpsSink);
+        y = renderSliderRow(ctx, x, y, w, "Дальность", (float) triggerBot.range, 1f, 6f, 1);
         y = renderDivider(ctx, x, y, w);
-        y = renderSectionLabel(ctx, x, y, w, "БИНДИНГ");
+        y = renderSectionLabel(ctx, x, y, "БИНДИНГ");
         y = renderKeybindRow(ctx, x, y, w, mx, my, "Кнопка TB", keyName(triggerBot.keyCode), 0);
 
         return y - startY + 8;
@@ -210,208 +152,271 @@ public class ClickGui extends Screen {
     private int renderAATab(DrawContext ctx, int x, int y, int w, int mx, int my) {
         int startY = y;
 
-        y = renderToggleRow(ctx, x, y, w, mx, my, "AimAssist", aimAssist.enabled, 110);
-
+        y = renderToggleRow(ctx, x, y, w, mx, my, "AimAssist", aimAssist.enabled);
         y = renderDivider(ctx, x, y, w);
-        y = renderSectionLabel(ctx, x, y, w, "РЕЖИМ ПРИЦЕЛИВАНИЯ");
-
+        y = renderSectionLabel(ctx, x, y, "РЕЖИМ ПРИЦЕЛИВАНИЯ");
         y = renderCycleRow(ctx, x, y, w, mx, my, "Режим",
-            new String[]{"legit", "free"},
-            new String[]{"Легит", "Свободный"},
-            aimAssist.aimModeStr, 118);
+            new String[]{"legit","free"}, new String[]{"Легит","Свободный"},
+            aimAssist.aimModeStr);
 
-        // Настройки LegitAim
         if ("legit".equals(aimAssist.aimModeStr)) {
-            y = renderSectionLabel(ctx, x, y, w, "  ЛЕГИТ");
-            y = renderSliderRow(ctx, x, y, w, mx, my, "Скорость",    (float) aimAssist.legitAim.speed,    0.1f, 3f, 2, 220);
-            y = renderSliderRow(ctx, x, y, w, mx, my, "Сглаживание", (float) aimAssist.legitAim.smoothing, 0.2f, 3f, 2, 221);
-            y = renderSliderRow(ctx, x, y, w, mx, my, "Макс. лерп",  (float) aimAssist.legitAim.maxLerp,   0.2f, 2.5f, 2, 222);
-            y = renderSliderRow(ctx, x, y, w, mx, my, "Мин. лерп",   (float) aimAssist.legitAim.minLerp,   0.01f, 0.5f, 2, 223);
-            y = renderToggleRow(ctx, x, y, w, mx, my, "Рандомизация", aimAssist.legitAim.randomize, 119);
+            y = renderSectionLabel(ctx, x, y, "  ЛЕГИТ");
+            y = renderSliderRow(ctx, x, y, w, "Скорость",    (float) aimAssist.legitAim.speed,     0.1f, 3f,   2);
+            y = renderSliderRow(ctx, x, y, w, "Сглаживание", (float) aimAssist.legitAim.smoothing,  0.2f, 3f,   2);
+            y = renderSliderRow(ctx, x, y, w, "Макс. лерп",  (float) aimAssist.legitAim.maxLerp,    0.2f, 2.5f, 2);
+            y = renderSliderRow(ctx, x, y, w, "Мин. лерп",   (float) aimAssist.legitAim.minLerp,    0.01f,0.5f, 2);
+            y = renderToggleRow(ctx, x, y, w, mx, my, "Рандомизация", aimAssist.legitAim.randomize);
         } else {
-            y = renderSectionLabel(ctx, x, y, w, "  СВОБОДНЫЙ");
-            y = renderSliderRow(ctx, x, y, w, mx, my, "Скорость",      (float) aimAssist.freeAim.speed,          5f, 20f, 1, 230);
-            y = renderSliderRow(ctx, x, y, w, mx, my, "Сила коррекции",(float) aimAssist.freeAim.corrStrength,   0.1f, 1f, 2, 231);
-            y = renderSliderRow(ctx, x, y, w, mx, my, "Свобода вниз",  (float) aimAssist.freeAim.freedomDown,   -1f, 1f, 2, 232);
-            y = renderSliderRow(ctx, x, y, w, mx, my, "Порог замедл.", (float) aimAssist.freeAim.slowThreshold,  1f, 20f, 1, 233);
-            y = renderToggleRow(ctx, x, y, w, mx, my, "Плавный вход",  aimAssist.freeAim.smoothEntry, 120);
-            y = renderToggleRow(ctx, x, y, w, mx, my, "Учитыв. сенсу", aimAssist.freeAim.useSens,    121);
-            y = renderToggleRow(ctx, x, y, w, mx, my, "Замедл. вблизи",aimAssist.freeAim.slowNear,   122);
-            y = renderToggleRow(ctx, x, y, w, mx, my, "Шум наводки",   aimAssist.freeAim.noise,      123);
+            y = renderSectionLabel(ctx, x, y, "  СВОБОДНЫЙ");
+            y = renderSliderRow(ctx, x, y, w, "Скорость",       (float) aimAssist.freeAim.speed,          5f, 20f, 1);
+            y = renderSliderRow(ctx, x, y, w, "Сила коррекции", (float) aimAssist.freeAim.corrStrength,   0.1f,1f, 2);
+            y = renderSliderRow(ctx, x, y, w, "Свобода вниз",   (float) aimAssist.freeAim.freedomDown,   -1f, 1f, 2);
+            y = renderSliderRow(ctx, x, y, w, "Порог замедл.",  (float) aimAssist.freeAim.slowThreshold,  1f, 20f, 1);
+            y = renderToggleRow(ctx, x, y, w, mx, my, "Плавный вход",  aimAssist.freeAim.smoothEntry);
+            y = renderToggleRow(ctx, x, y, w, mx, my, "Учитыв. сенсу", aimAssist.freeAim.useSens);
+            y = renderToggleRow(ctx, x, y, w, mx, my, "Замедл. вблизи",aimAssist.freeAim.slowNear);
+            y = renderToggleRow(ctx, x, y, w, mx, my, "Шум наводки",   aimAssist.freeAim.noise);
         }
 
         y = renderDivider(ctx, x, y, w);
-        y = renderSectionLabel(ctx, x, y, w, "ОБЩИЕ");
-
-        y = renderToggleRow(ctx, x, y, w, mx, my, "Только игроки",    aimAssist.onlyPlayers,     111);
-        y = renderToggleRow(ctx, x, y, w, mx, my, "Только с оружием", aimAssist.weaponOnly,      112);
-        y = renderToggleRow(ctx, x, y, w, mx, my, "Проверка стен",    aimAssist.wallCheck,       113);
-        y = renderToggleRow(ctx, x, y, w, mx, my, "Только по X",      aimAssist.onlyOnX,         114);
-        y = renderToggleRow(ctx, x, y, w, mx, my, "Видимые только",   aimAssist.visibleOnly,     115);
-        y = renderToggleRow(ctx, x, y, w, mx, my, "Не при еде",       aimAssist.notWhileEating,  116);
-        y = renderToggleRow(ctx, x, y, w, mx, my, "Не в инвентаре",   aimAssist.notInInventory,  117);
-
+        y = renderSectionLabel(ctx, x, y, "ОБЩИЕ");
+        y = renderToggleRow(ctx, x, y, w, mx, my, "Только игроки",    aimAssist.onlyPlayers);
+        y = renderToggleRow(ctx, x, y, w, mx, my, "Только с оружием", aimAssist.weaponOnly);
+        y = renderToggleRow(ctx, x, y, w, mx, my, "Проверка стен",    aimAssist.wallCheck);
+        y = renderToggleRow(ctx, x, y, w, mx, my, "Только по X",      aimAssist.onlyOnX);
+        y = renderToggleRow(ctx, x, y, w, mx, my, "Видимые только",   aimAssist.visibleOnly);
+        y = renderToggleRow(ctx, x, y, w, mx, my, "Не при еде",       aimAssist.notWhileEating);
+        y = renderToggleRow(ctx, x, y, w, mx, my, "Не в инвентаре",   aimAssist.notInInventory);
         y = renderDivider(ctx, x, y, w);
-        y = renderSectionLabel(ctx, x, y, w, "ПАРАМЕТРЫ");
-
-        y = renderSliderRow(ctx, x, y, w, mx, my, "Дальность",       (float) aimAssist.range,        1f, 6f,   1, 210);
-        y = renderSliderRow(ctx, x, y, w, mx, my, "FOV",             (float) aimAssist.fov,           10f, 360f, 0, 211);
-        y = renderSliderRow(ctx, x, y, w, mx, my, "Удержание (сек)", (float) aimAssist.holdAfterHit,  0f, 5f,   1, 213);
-
+        y = renderSectionLabel(ctx, x, y, "ПАРАМЕТРЫ");
+        y = renderSliderRow(ctx, x, y, w, "Дальность",       (float) aimAssist.range,        1f, 6f,   1);
+        y = renderSliderRow(ctx, x, y, w, "FOV",             (float) aimAssist.fov,           10f,360f, 0);
+        y = renderSliderRow(ctx, x, y, w, "Удержание (сек)", (float) aimAssist.holdAfterHit,  0f, 5f,  1);
         y = renderDivider(ctx, x, y, w);
-        y = renderSectionLabel(ctx, x, y, w, "БИНДИНГ");
+        y = renderSectionLabel(ctx, x, y, "БИНДИНГ");
         y = renderKeybindRow(ctx, x, y, w, mx, my, "Кнопка AA", keyName(aimAssist.keyCode), 1);
 
         return y - startY + 8;
     }
 
-    private int clickTBTab(int x, int y, int w, int imx, int imy, int btn) {
-        if (hitRow(x, y, w, imx, imy)) { triggerBot.toggle(); } y += ROW_H;
-        y += 11; y += 14; // divider + section
+    // ════════════════════════════════════════════════════════════════
+    // КОМПОНЕНТЫ
+    // ════════════════════════════════════════════════════════════════
 
-        if (hitRow(x, y, w, imx, imy)) triggerBot.critMode = triggerBot.critMode.equals("smart") ? "only_crits" : "smart";
-        y += ROW_H;
-        y += 11; y += 14;
+    private int renderToggleRow(DrawContext ctx, int x, int y, int w,
+                                int mx, int my, String label, boolean value) {
+        boolean hover = mx >= x && mx < x + w && my >= y && my < y + ROW_H;
+        if (hover) fillRect(ctx, x - 1, y, w + 2, ROW_H, COL_HOVER);
 
-        if (hitRow(x, y, w, imx, imy)) triggerBot.onlyPlayers  = !triggerBot.onlyPlayers;  y += ROW_H;
-        if (hitRow(x, y, w, imx, imy)) triggerBot.weaponOnly   = !triggerBot.weaponOnly;   y += ROW_H;
-        if (hitRow(x, y, w, imx, imy)) triggerBot.pauseOnUse   = !triggerBot.pauseOnUse;   y += ROW_H;
-        y += 11; y += 14;
-
-        if (hitRow(x, y, w, imx, imy)) triggerBot.customCooldown = !triggerBot.customCooldown; y += ROW_H;
-        if (triggerBot.customCooldown) {
-            if (hitSlider(x, y, w, imx, imy)) triggerBot.cooldownPct = (int) sliderValue(x, y, w, imx, 0f, 100f);
-            y += ROW_H + 10;
-        }
-        y += 11; y += 14;
-
-        if (hitSlider(x, y, w, imx, imy)) triggerBot.minDelay = (int) sliderValue(x, y, w, imx, 0f, 300f); y += ROW_H + 10;
-        if (hitSlider(x, y, w, imx, imy)) triggerBot.maxDelay = (int) sliderValue(x, y, w, imx, 0f, 300f); y += ROW_H + 10;
-        y += 11; y += 14;
-
-        if (hitRow(x, y, w, imx, imy)) triggerBot.sprintReset = !triggerBot.sprintReset; y += ROW_H;
-        if (hitRow(x, y, w, imx, imy)) triggerBot.tpsSink     = !triggerBot.tpsSink;     y += ROW_H;
-        if (hitSlider(x, y, w, imx, imy)) triggerBot.range    = sliderValue(x, y, w, imx, 1f, 6f); y += ROW_H + 10;
-        y += 11; y += 14;
-
-        if (hitRow(x, y, w, imx, imy)) capturingKey = 0; y += ROW_H;
-        return y;
+        int tW = 32, tH = 14;
+        int tx = x + w - tW - 2, ty = y + (ROW_H - tH) / 2;
+        fillRoundRect(ctx, tx, ty, tW, tH, value ? COL_ENABLED : COL_DISABLED);
+        int cx = value ? tx + tW - tH + 1 : tx + 1;
+        fillRoundRect(ctx, cx, ty + 1, tH - 2, tH - 2, 0xFFFFFFFF);
+        drawString(ctx, label, x + 6, y + (ROW_H - 8) / 2, value ? COL_TEXT : COL_SUBTEXT);
+        return y + ROW_H;
     }
 
-    private int clickAATab(int x, int y, int w, int imx, int imy, int btn) {
-        if (hitRow(x, y, w, imx, imy)) { aimAssist.toggle(); } y += ROW_H;
-        y += 11; y += 14;
+    private int renderCycleRow(DrawContext ctx, int x, int y, int w,
+                               int mx, int my, String label,
+                               String[] vals, String[] display, String current) {
+        boolean hover = mx >= x && mx < x + w && my >= y && my < y + ROW_H;
+        if (hover) fillRect(ctx, x - 1, y, w + 2, ROW_H, COL_HOVER);
 
-        // Режим прицеливания
-        if (hitRow(x, y, w, imx, imy)) aimAssist.aimModeStr = aimAssist.aimModeStr.equals("legit") ? "free" : "legit";
-        y += ROW_H;
+        String disp = current;
+        for (int i = 0; i < vals.length; i++)
+            if (vals[i].equals(current)) { disp = display[i]; break; }
 
-        boolean isLegit = "legit".equals(aimAssist.aimModeStr);
-        if (isLegit) {
-            y += 14; // section label
-            if (hitSlider(x, y, w, imx, imy)) aimAssist.legitAim.speed    = sliderValue(x, y, w, imx, 0.1f, 3f);    y += ROW_H + 10;
-            if (hitSlider(x, y, w, imx, imy)) aimAssist.legitAim.smoothing= sliderValue(x, y, w, imx, 0.2f, 3f);    y += ROW_H + 10;
-            if (hitSlider(x, y, w, imx, imy)) aimAssist.legitAim.maxLerp  = sliderValue(x, y, w, imx, 0.2f, 2.5f);  y += ROW_H + 10;
-            if (hitSlider(x, y, w, imx, imy)) aimAssist.legitAim.minLerp  = sliderValue(x, y, w, imx, 0.01f, 0.5f); y += ROW_H + 10;
-            if (hitRow(x, y, w, imx, imy))    aimAssist.legitAim.randomize = !aimAssist.legitAim.randomize; y += ROW_H;
-        } else {
-            y += 14;
-            if (hitSlider(x, y, w, imx, imy)) aimAssist.freeAim.speed         = sliderValue(x, y, w, imx, 5f, 20f);  y += ROW_H + 10;
-            if (hitSlider(x, y, w, imx, imy)) aimAssist.freeAim.corrStrength  = sliderValue(x, y, w, imx, 0.1f, 1f); y += ROW_H + 10;
-            if (hitSlider(x, y, w, imx, imy)) aimAssist.freeAim.freedomDown   = sliderValue(x, y, w, imx, -1f, 1f);  y += ROW_H + 10;
-            if (hitSlider(x, y, w, imx, imy)) aimAssist.freeAim.slowThreshold = sliderValue(x, y, w, imx, 1f, 20f);  y += ROW_H + 10;
-            if (hitRow(x, y, w, imx, imy))    aimAssist.freeAim.smoothEntry  = !aimAssist.freeAim.smoothEntry;  y += ROW_H;
-            if (hitRow(x, y, w, imx, imy))    aimAssist.freeAim.useSens      = !aimAssist.freeAim.useSens;      y += ROW_H;
-            if (hitRow(x, y, w, imx, imy))    aimAssist.freeAim.slowNear     = !aimAssist.freeAim.slowNear;     y += ROW_H;
-            if (hitRow(x, y, w, imx, imy))    aimAssist.freeAim.noise        = !aimAssist.freeAim.noise;        y += ROW_H;
-        }
-
-        y += 11; y += 14;
-        if (hitRow(x, y, w, imx, imy)) aimAssist.onlyPlayers    = !aimAssist.onlyPlayers;    y += ROW_H;
-        if (hitRow(x, y, w, imx, imy)) aimAssist.weaponOnly      = !aimAssist.weaponOnly;     y += ROW_H;
-        if (hitRow(x, y, w, imx, imy)) aimAssist.wallCheck       = !aimAssist.wallCheck;      y += ROW_H;
-        if (hitRow(x, y, w, imx, imy)) aimAssist.onlyOnX         = !aimAssist.onlyOnX;        y += ROW_H;
-        if (hitRow(x, y, w, imx, imy)) aimAssist.visibleOnly     = !aimAssist.visibleOnly;    y += ROW_H;
-        if (hitRow(x, y, w, imx, imy)) aimAssist.notWhileEating  = !aimAssist.notWhileEating; y += ROW_H;
-        if (hitRow(x, y, w, imx, imy)) aimAssist.notInInventory  = !aimAssist.notInInventory; y += ROW_H;
-
-        y += 11; y += 14;
-        if (hitSlider(x, y, w, imx, imy)) aimAssist.range       = sliderValue(x, y, w, imx, 1f, 6f);    y += ROW_H + 10;
-        if (hitSlider(x, y, w, imx, imy)) aimAssist.fov         = sliderValue(x, y, w, imx, 10f, 360f); y += ROW_H + 10;
-        if (hitSlider(x, y, w, imx, imy)) aimAssist.holdAfterHit= sliderValue(x, y, w, imx, 0f, 5f);    y += ROW_H + 10;
-
-        y += 11; y += 14;
-        if (hitRow(x, y, w, imx, imy)) capturingKey = 1; y += ROW_H;
-        return y;
+        int bW = 90, bX = x + w - bW - 2, bY = y + (ROW_H - 16) / 2;
+        fillRoundRect(ctx, bX, bY, bW, 16, COL_ACCENT2);
+        drawString(ctx, disp, bX + (bW - textWidth(disp)) / 2, bY + 4, 0xFFFFFFFF);
+        drawString(ctx, label, x + 6, y + (ROW_H - 8) / 2, COL_TEXT);
+        return y + ROW_H;
     }
 
+    private int renderSliderRow(DrawContext ctx, int x, int y, int w,
+                                String label, float value, float min, float max, int dec) {
+        int h = ROW_H + 10;
+        String valStr = dec == 0 ? String.valueOf((int) value)
+                                 : String.format("%." + dec + "f", value);
+        drawString(ctx, label, x + 6, y + 5, COL_SUBTEXT);
+        drawString(ctx, valStr, x + w - textWidth(valStr) - 4, y + 5, COL_ACCENT);
+
+        int sX = x + 6, sW = w - 12, sY = y + 19;
+        fillRoundRect(ctx, sX, sY, sW, 4, COL_SLIDER_BG);
+        int filled = (int)(sW * Math.max(0f, Math.min(1f, (value - min) / (max - min))));
+        fillRoundRect(ctx, sX, sY, filled, 4, COL_ACCENT);
+        fillRoundRect(ctx, sX + filled - 4, sY - 3, 8, 10, 0xFFFFFFFF);
+        return y + h;
+    }
+
+    private int renderKeybindRow(DrawContext ctx, int x, int y, int w,
+                                 int mx, int my, String label, String keyName, int bindIdx) {
+        boolean hover = mx >= x && mx < x + w && my >= y && my < y + ROW_H;
+        if (hover) fillRect(ctx, x - 1, y, w + 2, ROW_H, COL_HOVER);
+
+        boolean cap = capturingKey == bindIdx;
+        String disp = cap ? "§e[нажми клавишу]" : keyName;
+        int bW = 100, bX = x + w - bW - 2, bY = y + (ROW_H - 16) / 2;
+        fillRoundRect(ctx, bX, bY, bW, 16, cap ? COL_ACCENT : COL_SLIDER_BG);
+        String raw = cap ? "[нажми клавишу]" : keyName;
+        drawString(ctx, disp, bX + (bW - textWidth(raw)) / 2, bY + 4, 0xFFFFFFFF);
+        drawString(ctx, label, x + 6, y + (ROW_H - 8) / 2, COL_TEXT);
+        return y + ROW_H;
+    }
+
+    private int renderDivider(DrawContext ctx, int x, int y, int w) {
+        fillRect(ctx, x, y + 5, w, 1, COL_DIVIDER);
+        return y + 11;
+    }
+
+    private int renderSectionLabel(DrawContext ctx, int x, int y, String label) {
+        drawString(ctx, "§8" + label, x + 6, y + 2, COL_SUBTEXT);
+        return y + 14;
+    }
+
+    // ════════════════════════════════════════════════════════════════
+    // MOUSE / KEY
+    // ════════════════════════════════════════════════════════════════
+
+    @Override
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
-        int imx = (int) mouseX;
-        int imy = (int) mouseY;
+        int imx = (int) mouseX, imy = (int) mouseY;
 
-        // Закрыть захват бинда по любому клику вне кнопки
-        if (capturingKey >= 0) {
-            capturingKey = -1;
-            return true;
-        }
+        if (capturingKey >= 0) { capturingKey = -1; return true; }
 
-        // Drag header
         if (imx >= winX && imx < winX + WIN_W && imy >= winY && imy < winY + TAB_H) {
-            dragging = true;
-            dragOffX = imx - winX;
-            dragOffY = imy - winY;
-            return true;
+            dragging = true; dragOffX = imx - winX; dragOffY = imy - winY; return true;
         }
 
-        // Tab switching
-        int tabW = WIN_W / 2;
-        int tabY = winY + TAB_H;
+        int tabW = WIN_W / 2, tabY = winY + TAB_H;
         for (int i = 0; i < 2; i++) {
             int tx = winX + i * tabW;
             if (imx >= tx && imx < tx + tabW && imy >= tabY && imy < tabY + 22) {
-                activeTab = i;
-                scrollY = 0;
-                return true;
+                activeTab = i; scrollY = 0; return true;
             }
         }
 
-        // Content clicks
         int contentTop = winY + TAB_H + 22 + 2;
         int contentH   = WIN_H - TAB_H - 22 - 2;
         if (imx >= winX && imx < winX + WIN_W && imy >= contentTop && imy < contentTop + contentH) {
-            handleContentClick(imx, imy, button, contentTop);
+            int x = winX + PAD, w = WIN_W - PAD * 2;
+            int y = contentTop - (int) scrollY;
+            if (activeTab == 0) clickTBTab(x, y, w, imx, imy);
+            else                clickAATab(x, y, w, imx, imy);
             return true;
         }
 
         return super.mouseClicked(mouseX, mouseY, button);
     }
 
-    private void handleContentClick(int imx, int imy, int button, int contentTop) {
-        int x  = winX + PAD;
-        int w  = WIN_W - PAD * 2;
-        int y  = contentTop - (int) scrollY;
-
-        if (activeTab == 0) {
-            y = clickTBTab(x, y, w, imx, imy, button);
-        } else {
-            y = clickAATab(x, y, w, imx, imy, button);
+    private void clickTBTab(int x, int y, int w, int imx, int imy) {
+        if (hit(x, y, w, imx, imy, ROW_H)) { triggerBot.toggle(); return; } y += ROW_H;
+        y += 11; y += 14;
+        if (hit(x, y, w, imx, imy, ROW_H)) { triggerBot.critMode = triggerBot.critMode.equals("smart") ? "only_crits" : "smart"; return; } y += ROW_H;
+        y += 11; y += 14;
+        if (hit(x, y, w, imx, imy, ROW_H)) { triggerBot.onlyPlayers   = !triggerBot.onlyPlayers;   return; } y += ROW_H;
+        if (hit(x, y, w, imx, imy, ROW_H)) { triggerBot.weaponOnly    = !triggerBot.weaponOnly;    return; } y += ROW_H;
+        if (hit(x, y, w, imx, imy, ROW_H)) { triggerBot.pauseOnUse   = !triggerBot.pauseOnUse;    return; } y += ROW_H;
+        y += 11; y += 14;
+        if (hit(x, y, w, imx, imy, ROW_H)) { triggerBot.customCooldown = !triggerBot.customCooldown; return; } y += ROW_H;
+        if (triggerBot.customCooldown) {
+            if (hit(x, y, w, imx, imy, ROW_H + 10)) { triggerBot.cooldownPct = (int) sv(x, y, w, imx, 0f, 100f); return; } y += ROW_H + 10;
         }
+        y += 11; y += 14;
+        if (hit(x, y, w, imx, imy, ROW_H + 10)) { triggerBot.minDelay = (int) sv(x, y, w, imx, 0f, 300f); return; } y += ROW_H + 10;
+        if (hit(x, y, w, imx, imy, ROW_H + 10)) { triggerBot.maxDelay = (int) sv(x, y, w, imx, 0f, 300f); return; } y += ROW_H + 10;
+        y += 11; y += 14;
+        if (hit(x, y, w, imx, imy, ROW_H)) { triggerBot.sprintReset = !triggerBot.sprintReset; return; } y += ROW_H;
+        if (hit(x, y, w, imx, imy, ROW_H)) { triggerBot.tpsSink     = !triggerBot.tpsSink;     return; } y += ROW_H;
+        if (hit(x, y, w, imx, imy, ROW_H + 10)) { triggerBot.range  = sv(x, y, w, imx, 1f, 6f); return; } y += ROW_H + 10;
+        y += 11; y += 14;
+        if (hit(x, y, w, imx, imy, ROW_H)) { capturingKey = 0; }
     }
 
+    private void clickAATab(int x, int y, int w, int imx, int imy) {
+        if (hit(x, y, w, imx, imy, ROW_H)) { aimAssist.toggle(); return; } y += ROW_H;
+        y += 11; y += 14;
+        if (hit(x, y, w, imx, imy, ROW_H)) { aimAssist.aimModeStr = aimAssist.aimModeStr.equals("legit") ? "free" : "legit"; return; } y += ROW_H;
 
-    private boolean hitRow(int x, int y, int w, int mx, int my) {
-        return mx >= x && mx < x + w && my >= y && my < y + ROW_H;
+        if ("legit".equals(aimAssist.aimModeStr)) {
+            y += 14;
+            if (hit(x, y, w, imx, imy, ROW_H + 10)) { aimAssist.legitAim.speed     = sv(x, y, w, imx, 0.1f, 3f);    return; } y += ROW_H + 10;
+            if (hit(x, y, w, imx, imy, ROW_H + 10)) { aimAssist.legitAim.smoothing = sv(x, y, w, imx, 0.2f, 3f);    return; } y += ROW_H + 10;
+            if (hit(x, y, w, imx, imy, ROW_H + 10)) { aimAssist.legitAim.maxLerp   = sv(x, y, w, imx, 0.2f, 2.5f);  return; } y += ROW_H + 10;
+            if (hit(x, y, w, imx, imy, ROW_H + 10)) { aimAssist.legitAim.minLerp   = sv(x, y, w, imx, 0.01f, 0.5f); return; } y += ROW_H + 10;
+            if (hit(x, y, w, imx, imy, ROW_H)) { aimAssist.legitAim.randomize = !aimAssist.legitAim.randomize; return; } y += ROW_H;
+        } else {
+            y += 14;
+            if (hit(x, y, w, imx, imy, ROW_H + 10)) { aimAssist.freeAim.speed         = sv(x, y, w, imx, 5f, 20f);  return; } y += ROW_H + 10;
+            if (hit(x, y, w, imx, imy, ROW_H + 10)) { aimAssist.freeAim.corrStrength  = sv(x, y, w, imx, 0.1f, 1f); return; } y += ROW_H + 10;
+            if (hit(x, y, w, imx, imy, ROW_H + 10)) { aimAssist.freeAim.freedomDown   = sv(x, y, w, imx, -1f, 1f);  return; } y += ROW_H + 10;
+            if (hit(x, y, w, imx, imy, ROW_H + 10)) { aimAssist.freeAim.slowThreshold = sv(x, y, w, imx, 1f, 20f);  return; } y += ROW_H + 10;
+            if (hit(x, y, w, imx, imy, ROW_H)) { aimAssist.freeAim.smoothEntry = !aimAssist.freeAim.smoothEntry; return; } y += ROW_H;
+            if (hit(x, y, w, imx, imy, ROW_H)) { aimAssist.freeAim.useSens    = !aimAssist.freeAim.useSens;    return; } y += ROW_H;
+            if (hit(x, y, w, imx, imy, ROW_H)) { aimAssist.freeAim.slowNear   = !aimAssist.freeAim.slowNear;   return; } y += ROW_H;
+            if (hit(x, y, w, imx, imy, ROW_H)) { aimAssist.freeAim.noise      = !aimAssist.freeAim.noise;      return; } y += ROW_H;
+        }
+
+        y += 11; y += 14;
+        if (hit(x, y, w, imx, imy, ROW_H)) { aimAssist.onlyPlayers    = !aimAssist.onlyPlayers;    return; } y += ROW_H;
+        if (hit(x, y, w, imx, imy, ROW_H)) { aimAssist.weaponOnly      = !aimAssist.weaponOnly;     return; } y += ROW_H;
+        if (hit(x, y, w, imx, imy, ROW_H)) { aimAssist.wallCheck       = !aimAssist.wallCheck;      return; } y += ROW_H;
+        if (hit(x, y, w, imx, imy, ROW_H)) { aimAssist.onlyOnX         = !aimAssist.onlyOnX;        return; } y += ROW_H;
+        if (hit(x, y, w, imx, imy, ROW_H)) { aimAssist.visibleOnly     = !aimAssist.visibleOnly;    return; } y += ROW_H;
+        if (hit(x, y, w, imx, imy, ROW_H)) { aimAssist.notWhileEating  = !aimAssist.notWhileEating; return; } y += ROW_H;
+        if (hit(x, y, w, imx, imy, ROW_H)) { aimAssist.notInInventory  = !aimAssist.notInInventory; return; } y += ROW_H;
+        y += 11; y += 14;
+        if (hit(x, y, w, imx, imy, ROW_H + 10)) { aimAssist.range       = sv(x, y, w, imx, 1f, 6f);    return; } y += ROW_H + 10;
+        if (hit(x, y, w, imx, imy, ROW_H + 10)) { aimAssist.fov         = sv(x, y, w, imx, 10f, 360f); return; } y += ROW_H + 10;
+        if (hit(x, y, w, imx, imy, ROW_H + 10)) { aimAssist.holdAfterHit= sv(x, y, w, imx, 0f, 5f);    return; } y += ROW_H + 10;
+        y += 11; y += 14;
+        if (hit(x, y, w, imx, imy, ROW_H)) { capturingKey = 1; }
     }
 
-    private boolean hitSlider(int x, int y, int w, int mx, int my) {
-        int h = ROW_H + 10;
+    @Override
+    public boolean mouseDragged(double mouseX, double mouseY, int button, double dx, double dy) {
+        if (dragging) { winX = (int) mouseX - dragOffX; winY = (int) mouseY - dragOffY; return true; }
+        return super.mouseDragged(mouseX, mouseY, button, dx, dy);
+    }
+
+    @Override
+    public boolean mouseReleased(double mouseX, double mouseY, int button) {
+        dragging = false;
+        return super.mouseReleased(mouseX, mouseY, button);
+    }
+
+    @Override
+    public boolean mouseScrolled(double mouseX, double mouseY, double hAmt, double vAmt) {
+        int contentH   = WIN_H - TAB_H - 22 - 2;
+        int maxScroll  = Math.max(0, contentHeight - contentH);
+        scrollY = (float) Math.max(0, Math.min(scrollY - vAmt * SCROLL_SPEED, maxScroll));
+        return true;
+    }
+
+    @Override
+    public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
+        if (capturingKey == 0) { triggerBot.keyCode = keyCode; capturingKey = -1; return true; }
+        if (capturingKey == 1) { aimAssist.keyCode  = keyCode; capturingKey = -1; return true; }
+        if (keyCode == 256) { MinecraftClient.getInstance().setScreen(null); return true; }
+        return super.keyPressed(keyCode, scanCode, modifiers);
+    }
+
+    @Override public boolean shouldPause() { return false; }
+    @Override public boolean shouldCloseOnEsc() { return false; }
+
+    // ════════════════════════════════════════════════════════════════
+    // УТИЛИТЫ
+    // ════════════════════════════════════════════════════════════════
+
+    private boolean hit(int x, int y, int w, int mx, int my, int h) {
         return mx >= x && mx < x + w && my >= y && my < y + h;
     }
 
-    private float sliderValue(int x, int y, int w, int mx, float min, float max) {
-        int sliderX = x + 6;
-        int sliderW = w - 12;
-        float pct = Math.max(0f, Math.min(1f, (float)(mx - sliderX) / sliderW));
+    /** slider value из позиции мыши */
+    private float sv(int x, int y, int w, int mx, float min, float max) {
+        int sX = x + 6, sW = w - 12;
+        float pct = Math.max(0f, Math.min(1f, (float)(mx - sX) / sW));
         return min + (max - min) * pct;
     }
 
@@ -420,9 +425,7 @@ public class ClickGui extends Screen {
     }
 
     private void fillRoundRect(DrawContext ctx, int x, int y, int w, int h, int color) {
-        // Простой прямоугольник — скруглить нельзя без матрикса, просто заливка
         ctx.fill(x, y, x + w, y + h, color);
-        // Лёгкие "срезы" углов на 1px
         ctx.fill(x, y, x + 1, y + 1, 0);
         ctx.fill(x + w - 1, y, x + w, y + 1, 0);
         ctx.fill(x, y + h - 1, x + 1, y + h, 0);
@@ -440,8 +443,8 @@ public class ClickGui extends Screen {
     private static String keyName(int keyCode) {
         if (keyCode <= 0) return "NONE";
         try {
-            String name = org.lwjgl.glfw.GLFW.glfwGetKeyName(keyCode, 0);
-            if (name != null) return name.toUpperCase();
+            String n = org.lwjgl.glfw.GLFW.glfwGetKeyName(keyCode, 0);
+            if (n != null) return n.toUpperCase();
         } catch (Exception ignored) {}
         return "KEY_" + keyCode;
     }
