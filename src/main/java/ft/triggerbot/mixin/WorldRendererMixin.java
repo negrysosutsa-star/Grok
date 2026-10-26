@@ -4,6 +4,7 @@ import ft.triggerbot.ClientMain;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.render.Camera;
 import net.minecraft.client.render.GameRenderer;
+import net.minecraft.client.render.RenderTickCounter;
 import net.minecraft.client.render.WorldRenderer;
 import net.minecraft.client.util.math.MatrixStack;
 import net.minecraft.util.math.Vec3d;
@@ -16,15 +17,18 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 @Mixin(WorldRenderer.class)
 public class WorldRendererMixin {
 
-    // В 1.21.4 сигнатура render:
-    // render(Camera, boolean, GameRenderer, Matrix4f, Matrix4f, CallbackInfo)
-    // class_9922 = Camera, class_9779 = GameRenderer
+    // Точная сигнатура 1.21.4 из intermediary лога:
+    // render(RenderTickCounter, Scene, boolean, Camera, GameRenderer, Matrix4f, Matrix4f)
+    // class_9922 = RenderTickCounter
+    // class_9779 = Scene (net.minecraft.client.render.Scene)
     @Inject(method = "render", at = @At("TAIL"))
-    private void onRender(Camera camera,
+    private void onRender(RenderTickCounter tickCounter,
+                          net.minecraft.client.render.Scene scene,
                           boolean bl,
+                          Camera camera,
                           GameRenderer gameRenderer,
-                          Matrix4f matrix4f,
-                          Matrix4f matrix4f2,
+                          Matrix4f viewMatrix,
+                          Matrix4f projMatrix,
                           CallbackInfo ci) {
         if (ClientMain.INSTANCE == null) return;
         var esp = ClientMain.INSTANCE.esp;
@@ -34,12 +38,12 @@ public class WorldRendererMixin {
         if (mc.world == null || mc.player == null) return;
 
         Vec3d cam = camera.getPos();
-        float tickDelta = mc.getRenderTickCounter().getTickDelta(true);
+        float tickDelta = tickCounter.getTickDelta(true);
 
         var immediate = mc.getBufferBuilders().getEntityVertexConsumers();
 
         MatrixStack ms = new MatrixStack();
-        ms.multiplyPositionMatrix(matrix4f);
+        ms.multiplyPositionMatrix(viewMatrix);
 
         com.mojang.blaze3d.systems.RenderSystem.enableDepthTest();
 
