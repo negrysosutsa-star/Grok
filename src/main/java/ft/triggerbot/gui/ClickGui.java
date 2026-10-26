@@ -203,6 +203,7 @@ public class ClickGui extends Screen {
         y = renderDivider(ctx, x, y, w);
         y = renderSectionLabel(ctx, x, y, w, "БИНДИНГ");
         y = renderKeybindRow(ctx, x, y, w, mx, my, "Кнопка TB", keyName(triggerBot.keyCode), 0);
+
         return y - startY + 8;
     }
 
@@ -260,6 +261,7 @@ public class ClickGui extends Screen {
         y = renderDivider(ctx, x, y, w);
         y = renderSectionLabel(ctx, x, y, w, "БИНДИНГ");
         y = renderKeybindRow(ctx, x, y, w, mx, my, "Кнопка AA", keyName(aimAssist.keyCode), 1);
+
         return y - startY + 8;
     }
 
