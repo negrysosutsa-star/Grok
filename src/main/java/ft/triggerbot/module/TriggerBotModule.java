@@ -1,7 +1,9 @@
 package ft.triggerbot.module;
 
 import ft.triggerbot.util.CritChecks;
+import ft.triggerbot.util.KeyBindings;
 import ft.triggerbot.util.RandomUtil;
+import ft.triggerbot.util.TpsTracker;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.network.ClientPlayerEntity;
 import net.minecraft.entity.Entity;
@@ -9,7 +11,6 @@ import net.minecraft.entity.LivingEntity;
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.item.CrossbowItem;
 import net.minecraft.item.MaceItem;
-import net.minecraft.util.Hand;
 import net.minecraft.util.hit.EntityHitResult;
 import net.minecraft.entity.projectile.ProjectileUtil;
 import net.minecraft.util.math.Box;
@@ -17,6 +18,7 @@ import net.minecraft.util.math.Vec3d;
 
 public class TriggerBotModule extends Module {
 
+    // ─── Настройки ────────────────────────────────────────────────
     public String  critMode       = "smart";
     public boolean onlyPlayers    = true;
     public boolean weaponOnly     = true;
@@ -26,14 +28,20 @@ public class TriggerBotModule extends Module {
     public int     minDelay       = 0;
     public int     maxDelay       = 0;
     public double  range          = 3.0;
-    public int     keyCode        = 0;
+    /** Сброс спринта перед ударом */
+    public boolean sprintReset    = true;
+    /** Поправка тайминга под TPS сервера */
+    public boolean tpsSink        = true;
 
-    private long nextAttackTime = 0;
+    public int keyCode = 0;
+
+    // ─── Состояние ────────────────────────────────────────────────
+    private long nextAttackTime = 0L;
 
     public TriggerBotModule() { super("TriggerBot", 0); }
 
     @Override
-    public void onDisable() { nextAttackTime = 0; }
+    public void onDisable() { nextAttackTime = 0L; }
 
     public void onTick(MinecraftClient mc, AimAssistModule aimAssist) {
         if (!enabled) return;
@@ -49,20 +57,40 @@ public class TriggerBotModule extends Module {
 
         LivingEntity target = findTarget(player);
         if (target == null) return;
+
         if (!checkCooldown(player)) return;
         if (!checkCrit(player)) return;
 
+        // Сброс спринта перед ударом
+        if (sprintReset) KeyBindings.resetSprint();
+
         CritChecks.attack(target);
+
+        // Восстановить движение после сброса
+        if (sprintReset) KeyBindings.restoreMovement();
 
         if (aimAssist != null && aimAssist.enabled) aimAssist.onAttack(target);
 
+        // Задержка + TPS-поправка
         int delay = minDelay;
         if (maxDelay > minDelay) delay = minDelay + RandomUtil.nextInt(maxDelay - minDelay);
+
+        if (tpsSink) {
+            float tps = TpsTracker.getInstance().getFloat();
+            if (tps < 19.5f) {
+                // Сервер лагает — добавляем буфер чтобы не получить "слишком быстро"
+                double lag = (20.0 - tps) / 20.0;
+                delay += (int)(lag * 120);
+            }
+        }
+
         nextAttackTime = now + delay;
     }
 
     @Override
     public void onTick(MinecraftClient mc) { onTick(mc, null); }
+
+    // ─── Приватные хелперы ────────────────────────────────────────
 
     private LivingEntity findTarget(ClientPlayerEntity player) {
         Vec3d eye  = player.getCameraPosVec(1f);
