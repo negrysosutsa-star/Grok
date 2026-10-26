@@ -3,6 +3,7 @@ package ft.triggerbot.gui;
 import ft.triggerbot.ClientMain;
 import ft.triggerbot.module.AimAssistModule;
 import ft.triggerbot.module.TriggerBotModule;
+import ft.triggerbot.module.EspModule;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.screen.Screen;
@@ -22,7 +23,7 @@ public class ClickGui extends Screen {
     private static final int COL_SLIDER_BG = 0xFF2F3136;
     private static final int COL_DIVIDER   = 0xFF2C2F33;
 
-    private static final int WIN_W = 310;
+    private static final int WIN_W = 320;
     private static final int WIN_H = 460;
     private static final int TAB_H = 32;
     private static final int ROW_H = 26;
@@ -30,6 +31,7 @@ public class ClickGui extends Screen {
 
     private final TriggerBotModule triggerBot;
     private final AimAssistModule  aimAssist;
+    private final EspModule        esp;
 
     private int activeTab = 0;
 
@@ -47,6 +49,7 @@ public class ClickGui extends Screen {
         super(Text.literal("FT Client"));
         this.triggerBot = ClientMain.INSTANCE.triggerBot;
         this.aimAssist  = ClientMain.INSTANCE.aimAssist;
+        this.esp        = ClientMain.INSTANCE.esp;
     }
 
     @Override
@@ -63,7 +66,8 @@ public class ClickGui extends Screen {
 
     @Override
     public void render(DrawContext ctx, int mouseX, int mouseY, float delta) {
-        this.renderBackground(ctx, mouseX, mouseY, delta);
+        // Тёмный оверлей без блюра
+        ctx.fill(0, 0, this.width, this.height, 0x88000000);
 
         int wx = winX, wy = winY;
 
@@ -72,16 +76,16 @@ public class ClickGui extends Screen {
         fillRect(ctx, wx, wy, WIN_W, TAB_H, COL_HEADER);
         drawString(ctx, "§bFT Client §7v1.2", wx + PAD, wy + TAB_H / 2 - 4, COL_TEXT);
 
-        int tabW = WIN_W / 2;
-        for (int i = 0; i < 2; i++) {
-            String label   = i == 0 ? "TriggerBot" : "AimAssist";
-            boolean active  = activeTab == i;
-            boolean enabled = i == 0 ? triggerBot.enabled : aimAssist.enabled;
+        int tabW = WIN_W / 3;
+        String[] tabLabels   = {"TriggerBot", "AimAssist", "ESP"};
+        boolean[] tabEnabled = {triggerBot.enabled, aimAssist.enabled, esp.enabled};
+        for (int i = 0; i < 3; i++) {
+            boolean active = activeTab == i;
             int tx = wx + i * tabW, ty = wy + TAB_H;
             boolean hover = mouseX >= tx && mouseX < tx + tabW && mouseY >= ty && mouseY < ty + 22;
             fillRect(ctx, tx, ty, tabW, 22, active ? COL_ACCENT : (hover ? COL_HOVER : COL_HEADER));
-            fillRect(ctx, tx + 8, ty + 8, 6, 6, enabled ? COL_ENABLED : COL_DISABLED);
-            drawString(ctx, label, tx + 20, ty + 7, active ? 0xFFFFFFFF : COL_SUBTEXT);
+            fillRect(ctx, tx + 6, ty + 8, 6, 6, tabEnabled[i] ? COL_ENABLED : COL_DISABLED);
+            drawString(ctx, tabLabels[i], tx + 16, ty + 7, active ? 0xFFFFFFFF : COL_SUBTEXT);
             if (active) fillRect(ctx, tx, ty + 20, tabW, 2, COL_ACCENT);
         }
 
@@ -91,9 +95,10 @@ public class ClickGui extends Screen {
         ctx.enableScissor(wx, contentTop, wx + WIN_W, contentTop + contentH);
         int y = contentTop - (int) scrollY;
         int rowW = WIN_W - PAD * 2;
-        int totalH = activeTab == 0
-            ? renderTBTab(ctx, wx + PAD, y, rowW, mouseX, mouseY)
-            : renderAATab(ctx, wx + PAD, y, rowW, mouseX, mouseY);
+        int totalH;
+        if (activeTab == 0)      totalH = renderTBTab(ctx, wx + PAD, y, rowW, mouseX, mouseY);
+        else if (activeTab == 1) totalH = renderAATab(ctx, wx + PAD, y, rowW, mouseX, mouseY);
+        else                     totalH = renderEspTab(ctx, wx + PAD, y, rowW, mouseX, mouseY);
         contentHeight = totalH;
         ctx.disableScissor();
 
@@ -275,7 +280,30 @@ public class ClickGui extends Screen {
         return y + 14;
     }
 
-    // ════════════════════════════════════════════════════════════════
+    private int renderEspTab(DrawContext ctx, int x, int y, int w, int mx, int my) {
+        int startY = y;
+
+        y = renderToggleRow(ctx, x, y, w, mx, my, "ESP", esp.enabled);
+        y = renderDivider(ctx, x, y, w);
+        y = renderSectionLabel(ctx, x, y, "РЕЖИМ ЦВЕТА");
+        y = renderCycleRow(ctx, x, y, w, mx, my, "Цвет",
+            new String[]{"0","1","2"},
+            new String[]{"Team","Здоровье","Фикс."},
+            String.valueOf(esp.colorMode));
+        y = renderDivider(ctx, x, y, w);
+        y = renderSectionLabel(ctx, x, y, "ФИЛЬТРЫ");
+        y = renderToggleRow(ctx, x, y, w, mx, my, "Только игроки", esp.onlyPlayers);
+        y = renderToggleRow(ctx, x, y, w, mx, my, "Полоса HP",     esp.healthBar);
+        y = renderToggleRow(ctx, x, y, w, mx, my, "Имя",           esp.showName);
+        y = renderToggleRow(ctx, x, y, w, mx, my, "Дистанция",     esp.showDist);
+        y = renderDivider(ctx, x, y, w);
+        y = renderSectionLabel(ctx, x, y, "БИНДИНГ");
+        y = renderKeybindRow(ctx, x, y, w, mx, my, "Кнопка ESP", keyName(esp.keyCode), 2);
+
+        return y - startY + 8;
+    }
+    
+// ════════════════════════════════════════════════════════════════
     // MOUSE / KEY
     // ════════════════════════════════════════════════════════════════
 
@@ -289,8 +317,8 @@ public class ClickGui extends Screen {
             dragging = true; dragOffX = imx - winX; dragOffY = imy - winY; return true;
         }
 
-        int tabW = WIN_W / 2, tabY = winY + TAB_H;
-        for (int i = 0; i < 2; i++) {
+        int tabW = WIN_W / 3, tabY = winY + TAB_H;
+        for (int i = 0; i < 3; i++) {
             int tx = winX + i * tabW;
             if (imx >= tx && imx < tx + tabW && imy >= tabY && imy < tabY + 22) {
                 activeTab = i; scrollY = 0; return true;
@@ -302,8 +330,9 @@ public class ClickGui extends Screen {
         if (imx >= winX && imx < winX + WIN_W && imy >= contentTop && imy < contentTop + contentH) {
             int x = winX + PAD, w = WIN_W - PAD * 2;
             int y = contentTop - (int) scrollY;
-            if (activeTab == 0) clickTBTab(x, y, w, imx, imy);
-            else                clickAATab(x, y, w, imx, imy);
+            if (activeTab == 0)      clickTBTab(x, y, w, imx, imy);
+            else if (activeTab == 1) clickAATab(x, y, w, imx, imy);
+            else                     clickEspTab(x, y, w, imx, imy);
             return true;
         }
 
@@ -398,6 +427,7 @@ public class ClickGui extends Screen {
     public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
         if (capturingKey == 0) { triggerBot.keyCode = keyCode; capturingKey = -1; return true; }
         if (capturingKey == 1) { aimAssist.keyCode  = keyCode; capturingKey = -1; return true; }
+        if (capturingKey == 2) { esp.keyCode        = keyCode; capturingKey = -1; return true; }
         if (keyCode == 256) { MinecraftClient.getInstance().setScreen(null); return true; }
         return super.keyPressed(keyCode, scanCode, modifiers);
     }
@@ -408,6 +438,21 @@ public class ClickGui extends Screen {
     // ════════════════════════════════════════════════════════════════
     // УТИЛИТЫ
     // ════════════════════════════════════════════════════════════════
+
+    private void clickEspTab(int x, int y, int w, int imx, int imy) {
+        if (hit(x, y, w, imx, imy, ROW_H)) { esp.toggle(); return; } y += ROW_H;
+        y += 11; y += 14;
+        if (hit(x, y, w, imx, imy, ROW_H)) {
+            esp.colorMode = (esp.colorMode + 1) % 3; return;
+        } y += ROW_H;
+        y += 11; y += 14;
+        if (hit(x, y, w, imx, imy, ROW_H)) { esp.onlyPlayers = !esp.onlyPlayers; return; } y += ROW_H;
+        if (hit(x, y, w, imx, imy, ROW_H)) { esp.healthBar   = !esp.healthBar;   return; } y += ROW_H;
+        if (hit(x, y, w, imx, imy, ROW_H)) { esp.showName    = !esp.showName;    return; } y += ROW_H;
+        if (hit(x, y, w, imx, imy, ROW_H)) { esp.showDist    = !esp.showDist;    return; } y += ROW_H;
+        y += 11; y += 14;
+        if (hit(x, y, w, imx, imy, ROW_H)) { capturingKey = 2; }
+    }
 
     private boolean hit(int x, int y, int w, int mx, int my, int h) {
         return mx >= x && mx < x + w && my >= y && my < y + h;
