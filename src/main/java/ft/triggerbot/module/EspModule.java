@@ -40,6 +40,11 @@ public class EspModule extends Module {
 
     public EspModule() { super("ESP", 2); }
 
+    @Override
+    public void onTick(net.minecraft.client.MinecraftClient mc) {
+        // ESP рендерится из WorldRendererMixin, не через tick
+    }
+
     // Вызывается из WorldRendererMixin после рендера сущностей
     public void onRender(MatrixStack ms, VertexConsumerProvider vcp,
                          float tickDelta, Vec3d cam) {
